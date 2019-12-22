@@ -75,6 +75,10 @@ In settings it is almost the same as **Escrow** settings (see above), with the o
 
 **auto_release** should not be set (set to 0), then if arbiter does not accept releasing money in time, users who invested into crowdfunding would be able to reclaim their money back.
 
+#### Custody
+
+It is possible to create a custody smart contract, that holds funds for some time, until receiver confirms that he wants to receive them, if confirmation is not done by that time, sender may recover sent funds. The configuration is similar to **Escrow** contract with the exception that **auto_release** must be false, and **controller** is the same as **beneficiary**.
+
 #### Use your imagination
 
 Using combinations of all those settings it is possible to create interesting contracts. Moreover, contract is not restricted to single beneficiary - it can distribute collected money either with percentages of total sum, fixed sums, or combination of both.

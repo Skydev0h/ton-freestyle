@@ -131,6 +131,18 @@ It should be noted carefully that percentage is calculated from total sum, not r
 
 Contract creation script takes care of that, and warns, if calculated amount to be sent if only minimum allowed amount of grams is collected is not enough to send all funds including percentages and fixed sums.
 
+#### Example: Custody
+
+For this example, money is sent to this SC, that holds it for some time, and receiver must confirm that he wants to receive that money in time. Otherwise, sender will be able to reclaim sent money.
+
+```bash
+fift -s ct-create.fif -0 495 -9 505 -m 500 -r -c 3600 -d 3600
+     -i Ef8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAU 
+     -b Ef8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAU -- -1 custody
+```
+
+The configuration is almost similar to **Escrow** with the exception that **ultimate beneficiary** and **controller** are actually the same, and **auto_release** must be set to false for logical reasons.
+
 ### Generating external messages
 
 In order to generate external message `ct-ext-ctrl-gen.fif` must be used.
