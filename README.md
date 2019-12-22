@@ -15,7 +15,7 @@ More details about those ideas should be read on their respective pages linked a
 
 **It should be noted that in order to run tests, a patch should be applied**, that adds fift commands `(gas)runvmctxact` that allows **inspecting resulting action register (c5)** after the contract execution to run tests more thoroughly. It may be possible to disable that functionality by swapping comments on first lines, but that is not recommended.
 
-Link to this patch on the GitHub repository: *To be defined*.
+Link to the pull request on the TON GitHub repository: [Addition of (gas)runvmctxact(q) functions](https://github.com/ton-blockchain/ton/pull/220).
 
 Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
 
