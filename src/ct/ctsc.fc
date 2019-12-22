@@ -1,0 +1,443 @@
+{-
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #1: Conditional transfer smart contract (CTSC)                 |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+-}
+
+;;===========================================================================;;
+;; Custom ASM instructions                                                   ;;
+;;===========================================================================;;
+
+int buy_gas(int grams) asm "BUYGAS";
+(slice, int) dict_get?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTGET" "NULLSWAPIFNOT";
+(cell, int) dict_delete?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTDEL";
+;; forall X -> (tuple, X) tpop(tuple list) asm "TPOP";
+
+;;===========================================================================;;
+;; Constants, structures                                                     ;;
+;;===========================================================================;;
+
+;;  Bit length       ;; turns LDU into LDUX and STU into STUX
+;; int BL:Flags()    asm "4 PUSHINT";
+;; int BL:UnixTime() asm "32 PUSHINT";
+;; int BL:ChainId()  asm "8 PUSHINT";
+;; int BL:Address()  asm "256 PUSHINT";
+
+;;  Message flag
+int MF:AddTranFees()  asm "1 PUSHINT";
+int MF:IgnoreErrors() asm "2 PUSHINT";
+int MF:MsgBalance()   asm "64 PUSHINT";
+int MF:AllBalance()   asm "128 PUSHINT";
+
+;; int Flag:HasController()     asm "1 PUSHINT";
+int .HasController?(int a)   asm "1 PUSHINT AND";
+int .HasNoController?(int a) asm "1 PUSHINT AND ISZERO";
+
+;; int Flag:AutoRelease()       asm "2 PUSHINT";
+int .AutoRelease?(int a)     asm "2 PUSHINT AND";
+int .AutoReclaim?(int a)     asm "2 PUSHINT AND ISZERO";
+
+;; int Flag:ContinuousCell()    asm "4 PUSHINT";
+int .ContinuousColl?(int a)  asm "4 PUSHINT AND";
+int .LimitedColl?(int a)     asm "4 PUSHINT AND ISZERO";
+
+int Flag:CanReclaim()        asm "8 PUSHINT";
+int .CanReclaim?(int a)      asm "8 PUSHINT AND";
+int .CantReclaim?(int a)     asm "8 PUSHINT AND ISZERO";
+
+int Flag:Initialized()       asm "16 PUSHINT";
+int .Initialized?(int a)     asm "16 PUSHINT AND";
+int .Uninitialized?(int a)   asm "16 PUSHINT AND ISZERO";
+
+int Flag:Destroyed()         asm "32 PUSHINT";
+int .Destroyed?(int a)       asm "32 PUSHINT AND";
+
+int Op:Release() asm "1382378597 PUSHINT"; ;; 0x52656c65
+int Op:Reclaim() asm "1382247533 PUSHINT"; ;; 0x52636c6d
+int Op:GasPlus() asm "1197568811 PUSHINT"; ;; 0x4761732b
+
+tuple PackStorage (int min_grams, int max_grams, int min_accepted,
+		           int collect_deadline, int release_locktime, int release_deadline,
+			       int Flags, cell investors, cell beneficiaries,
+			       int ext_controller, int controller_wc, int controller_addr,
+			       int beneficiary_wc, int beneficiary_addr) asm "14 TUPLE";
+				   
+(int, int, int, int, int, int, int, cell, cell, int, int, int, int, int) UnpackStorage(tuple data) asm "14 UNTUPLE";
+				   
+int [min_grams](tuple data)        asm "0 INDEX";
+int [max_grams](tuple data)        asm "1 INDEX";
+int [min_accepted](tuple data)     asm "2 INDEX";
+int [collect_deadline](tuple data) asm "3 INDEX";
+int [release_locktime](tuple data) asm "4 INDEX";
+int [release_deadline](tuple data) asm "5 INDEX";
+int [flags_pack](tuple data)       asm "6 INDEX";
+cell [investors](tuple data)       asm "7 INDEX";
+cell [beneficiaries](tuple data)   asm "8 INDEX";
+int [ext_controller](tuple data)   asm "9 INDEX";
+int [controller_wc](tuple data)    asm "10 INDEX";
+int [controller_addr](tuple data)  asm "11 INDEX";
+int [beneficiary_wc](tuple data)   asm "12 INDEX";
+int [beneficiary_addr](tuple data) asm "13 INDEX";
+
+(tuple, ()) ~[flags_pack=](tuple data, int flags) impure asm "6 SETINDEX";
+(tuple, ()) ~[investors=](tuple data, cell invs) impure asm "7 SETINDEX";
+(tuple, ()) ~[beneficiaries=](tuple data, cell bens) impure asm "8 SETINDEX";
+
+;;===========================================================================;;
+
+tuple Storage:Load() inline_ref {
+	slice cs = get_data().begin_parse();
+	
+	int min_grams        = cs~load_grams();
+	int max_grams        = cs~load_grams();
+	int min_accepted     = cs~load_grams();
+	int collect_deadline = cs~load_uint(32); ;; BL:UnixTime
+	int release_locktime = cs~load_uint(32); ;; BL:UnixTime
+	int release_deadline = cs~load_uint(32); ;; BL:UnixTime
+	
+	;; can_reclaim continuous_coll auto_release has_controller
+	int Flags       = cs~load_uint(6); ;; BL:Flags
+	
+	cell investors       = cs~load_dict();
+	cell beneficiaries   = cs~load_dict();
+	int ext_controller   = 0;
+	int controller_wc    = 0;
+	int controller_addr  = 0;
+	
+	if (Flags.HasController?()) {
+		ext_controller   = cs~load_uint(1);
+		if (ext_controller == 0) {
+			controller_wc = cs~load_int(8); ;; BL:ChainId
+		}
+		controller_addr  = cs~load_uint(256); ;; BL:Address
+	}
+	int beneficiary_wc   = cs~load_int(8); ;; BL:ChainId
+	int beneficiary_addr = cs~load_uint(256); ;; BL:Address
+	cs.end_parse();
+	return PackStorage(
+		min_grams, max_grams, min_accepted,
+		collect_deadline, release_locktime, release_deadline,
+		Flags, investors, beneficiaries,
+		ext_controller, controller_wc, controller_addr,
+		beneficiary_wc, beneficiary_addr
+	);
+}
+
+() Storage:Save(tuple data) impure inline_ref {
+	(int min_grams, int max_grams, int min_accepted,
+	 int collect_deadline, int release_locktime, int release_deadline,
+	 int Flags, cell investors, cell beneficiaries,
+	 int ext_controller, int controller_wc, int controller_addr,
+	 int beneficiary_wc, int beneficiary_addr) = UnpackStorage(data);
+	builder bld = begin_cell()
+			.store_grams(min_grams) ;; min_grams
+			.store_grams(max_grams) ;; max_grams
+			.store_grams(min_accepted) ;; min_accepted
+			.store_uint(collect_deadline, 32) ;; collect_deadline BL:UnixTime
+			.store_uint(release_locktime, 32) ;; release_locktime BL:UnixTime
+			.store_uint(release_deadline, 32) ;; release_deadline BL:UnixTime
+	        .store_uint(Flags, 6) ;; Flags BL:Flags
+			.store_dict(investors) ;; investors
+			.store_dict(beneficiaries); ;; beneficiaries
+	if (Flags.HasController?()) {
+		bld~store_uint(ext_controller, 1);
+		if (ext_controller == 0) {
+			bld~store_int(controller_wc, 8); ;; BL:ChainId
+		}
+		bld~store_uint(controller_addr, 256); ;; BL:Address
+	}
+	bld~store_int(beneficiary_wc, 8); ;; beneficiary_wc BL.ChainId
+	bld~store_uint(beneficiary_addr, 256); ;; beneficiary_addr BL:Address()
+	set_data(bld.end_cell());
+}
+
+;;===========================================================================;;
+
+() Message:Send(int wc, int addr, int grams, int mode) impure inline_ref {
+	;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool 
+	;;                src:MsgAddress -> 01 b 000 0x18 | 100
+	;;                NO BOUNCE: 010000100
+	var msg = begin_cell()
+		.store_uint(0x84, 9) ;; NO BOUNCE: 0 1000 100, bounce: 0xC4
+		.store_int(wc, 8)
+		.store_uint(addr, 256)
+		.store_grams(grams)
+		.store_uint (0, 107); ;; 1 + 4 + 4 + 64 + 32 + 1 + 1
+	send_raw_message(msg.end_cell(), mode | MF:IgnoreErrors());
+}
+
+;;===========================================================================;;
+
+() Logic:DoRelease(tuple data) impure {
+	int Flags = data.[flags_pack]();
+	throw_if(35, Flags.CanReclaim?()); ;; Additional safeguard check
+	accept_message(); ;; full speed ahead
+	Flags |= Flag:Destroyed();
+	data~[flags_pack=](Flags);
+	cell ben = data.[beneficiaries]();
+	data~[investors=](null());
+	data~[beneficiaries=](null());
+	Storage:Save(data);
+	commit();
+	int bal = get_balance().car();
+	int rem = bal;
+	var msg_hdr = begin_cell().store_uint(0x84, 9); ;; NO BOUNCE: 0 1000 100, bounce: 0xC4
+	if (~ ben.cell_null?()) {
+		slice val = ben.begin_parse();
+		while (val.slice_bits()) {
+			int bwc = val~load_int(8);
+			int baddr = val~load_uint(256);
+			int bvalue = val~load_grams();
+			int percent = 0;
+			if (bvalue == 0) {
+				percent = val~load_uint(20);
+				;; DISABLED FUNCTIONALITY: High precision percentages
+				if (percent < 1000000) {
+					bvalue = bal * percent / 1000000;
+				} {- elseif (percent < 1010000) {
+					bvalue = (bal * (percent - 1000000)) / 10000000;
+				} elseif (percent < 1020000) {
+					bvalue = (bal * (percent - 1010000)) / 100000000;
+				} elseif (percent < 1030000) {
+					bvalue = (bal * (percent - 1020000)) / 1000000000;
+				} elseif (percent < 1040000) {
+					bvalue = (bal * (percent - 1030000)) / 10000000000;
+				} else {
+					bvalue = (bal * (percent - 1040000)) / 100000000000;
+				} -}
+			}
+			int to_send = min(bvalue, rem);
+			if (to_send > 0) {
+				var msg = msg_hdr.store_int(bwc, 8).store_uint(baddr, 256).store_grams(to_send).store_uint(0, 107);
+				send_raw_message(msg.end_cell(), MF:IgnoreErrors());
+				rem -= to_send;
+				;; Message:Send(bwc, baddr, bvalue, 0);
+			}
+			if ((val.slice_bits() == 0) & (val.slice_refs() >= 1)) {
+				cell next = val~load_ref();
+				val = next.begin_parse();
+			}
+		}
+	}
+	Message:Send(data.[beneficiary_wc](), data.[beneficiary_addr](), 0, MF:AllBalance());
+}
+
+;;===========================================================================;;
+
+() Controller:ReleaseFunds(tuple data, int now) impure {
+	throw_if(31, now < data.[collect_deadline]());
+	throw_if(32, now < data.[release_locktime]());
+	throw_if(33, (data.[release_deadline]() != 0) & (now >= data.[release_deadline]()));
+	int Flags = data.[flags_pack]();
+	throw_if(34, Flags.CanReclaim?());
+	int bal = get_balance().car();
+	throw_if(36, bal < data.[min_grams]());
+	if (data.[ext_controller]()) { accept_message(); }
+	Logic:DoRelease(data);
+}
+
+() Controller:InitiateReclaim(tuple data, int now) impure {
+	throw_if(31, now < data.[collect_deadline]());
+	throw_if(32, now < data.[release_locktime]());
+	throw_if(33, (data.[release_deadline]() != 0) & (now >= data.[release_deadline]()));
+	if (data.[ext_controller]()) { accept_message(); }
+	data~[flags_pack=](data.[flags_pack]() | Flag:CanReclaim());
+	data~[beneficiaries=](null());
+	Storage:Save(data);
+}
+
+;;===========================================================================;;
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+	var data = Storage:Load();
+
+	int Flags = data.[flags_pack]();
+	if (Flags.Destroyed?()) {
+		accept_message();
+		Message:Send(data.[beneficiary_wc](), data.[beneficiary_addr](), 0, MF:AllBalance());
+		return();
+	}
+	
+	slice cs = in_msg_cell.begin_parse();
+	int msgflg = cs~load_uint(4);
+	if (msgflg & 1) { return (); } ;; bounced messages
+	slice s_addr = cs~load_msg_addr();
+	(int src_wc, int src_addr) = s_addr.parse_std_addr();
+	
+	int now = now();
+	int bal = get_balance().car() - msg_value;
+	
+	int collect_deadline = data.[collect_deadline]();
+	int release_deadline = data.[release_deadline]();
+	
+	if (Flags.CantReclaim?() & (collect_deadline > 0) & (now >= collect_deadline) & (bal < data.[min_grams]())) {
+		;; LOGIC: Process failing to collect min grams before collect deadline <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		Flags |= Flag:CanReclaim();
+		data~[flags_pack=](Flags);
+		data~[beneficiaries=](null());
+		Storage:Save(data);
+	}
+	
+	if (Flags.AutoRelease?() & Flags.CantReclaim?() & (release_deadline > 0) & (now >= release_deadline) & (bal >= data.[min_grams]())) {
+		;; LOGIC: Automatically release money after release deadline <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		Logic:DoRelease(data);
+		return ();
+	}
+	
+	slice src = s_addr;
+	if (src~load_uint(3) == 5) { ;; 10 1 - anycast is present!!!
+		src = begin_cell().store_int(src_wc, 8).store_uint(src_addr, 256).end_cell().begin_parse();
+	}
+	
+	int controller_addr = data.[controller_addr]();
+	int controller_wc = data.[controller_wc]();
+	
+	int op = 0;
+	if (slice_bits(in_msg) >= 32) {
+		op = in_msg~load_uint(32);
+	}
+	
+	if ((controller_addr != 0) & (data.[ext_controller]() == 0) & (Flags.CantReclaim?())
+	  & (src_wc == controller_wc) & (src_addr == controller_addr)) {
+	    ;; LOGIC: Process controller internal message <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	    Message:Send(src_wc, src_addr, 0, MF:MsgBalance());
+		if (op == Op:Release()) {
+			Controller:ReleaseFunds(data, now);
+		} elseif (op == Op:Reclaim()) {
+			Controller:InitiateReclaim(data, now);
+		}
+		return ();
+	}
+	
+	if (Flags.AutoReclaim?() & Flags.CantReclaim?() & (release_deadline > 0) & (now >= release_deadline)) {
+	    ;; LOGIC: Activate automatic reclaim after release deadline <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		Flags |= Flag:CanReclaim();
+		data~[flags_pack=](Flags);
+		data~[beneficiaries=](null());
+		Storage:Save(data);
+		commit();
+	}
+	
+	cell investors = data.[investors]();
+	if (Flags.CanReclaim?()) {
+		;; LOGIC: Process internal message in reclaim mode <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		(slice res, int f) = investors.dict_get?(264, src);
+		if (~ f) {
+			Message:Send(src_wc, src_addr, 0, MF:MsgBalance());
+			return ();
+		}
+		investors~dict_delete?(264, src);
+		Message:Send(src_wc, src_addr, res~load_grams(), MF:MsgBalance());
+		data~[investors=](investors);
+		Storage:Save(data);
+		return ();
+	}
+	
+	int reserved = 5000000000; ;; 5 Gram
+	if (op == Op:GasPlus()) {
+		;; LOGIC: Alter reserved part for gas <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		reserved = max(reserved, in_msg~load_grams());
+		;; int newreserved = in_msg~load_grams();
+		;; if (newreserved > reserved) {
+		;; 	reserved = newreserved;
+		;;}
+	}
+	buy_gas(reserved);
+	
+	int deposit = msg_value - reserved;
+	int min_accepted = data.[min_accepted]();
+	if (deposit < min_accepted) {
+		;; LOGIC: Check min accepted Gram condition <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance());
+		return ();
+	}
+	
+	if((collect_deadline != 0) & (now >= collect_deadline) & (Flags.LimitedColl?())) {
+		;; LOGIC: Prevent deposit if collect deadline reached and continuous collection disabled <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance());
+		return ();
+	}
+	
+	int max_grams = data.[max_grams]();
+	if ((max_grams > 0) & (bal + deposit > max_grams)) {
+		;; LOGIC: Process max grams overflowing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		deposit = max_grams - bal;
+	}
+	
+	if (deposit == 0) {
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance());
+		return ();
+	}
+	
+	int accnt = 0;
+	(slice res, int f) = investors.dict_get?(264, src);
+	if (f) { accnt = res~load_grams(); }
+	
+	accnt += deposit;
+	investors~dict_set_builder(264, src, begin_cell().store_grams(accnt));
+	data~[investors=](investors);
+	
+	Storage:Save(data);
+
+	raw_reserve(bal + deposit, 0);
+	Message:Send(src_wc, src_addr, 0, MF:AllBalance());
+	
+	return ();
+}
+
+() recv_external(slice in_msg) impure {
+	var data = Storage:Load();
+	int Flags = data.[flags_pack]();
+	if (Flags.Destroyed?()) {
+		accept_message();
+		Message:Send(data.[beneficiary_wc](), data.[beneficiary_addr](), 0, MF:AllBalance());
+		return();
+	}
+	if (Flags.Uninitialized?())	{
+		accept_message();
+		Flags |= Flag:Initialized();
+		data~[flags_pack=](Flags);
+		Storage:Save(data);
+		return ();
+	}
+	throw_unless(41, data.[ext_controller]());
+	slice signature = in_msg~load_bits(512);
+	int shash = slice_hash(in_msg);
+	throw_unless(42, check_signature(shash, signature, data.[controller_addr]()));
+	int now = now();
+	int op = in_msg~load_uint(32);
+	if (op == Op:Release()) {
+		Controller:ReleaseFunds(data, now);
+	} elseif (op == Op:Reclaim()) {
+		Controller:InitiateReclaim(data, now);
+	} else {
+		throw(30);
+	}
+	return ();
+}
+
+;;===========================================================================;;
+
+_ get_config() method_id {
+	return Storage:Load();
+}
+
+int reclaiming() method_id {
+	return Storage:Load().[flags_pack]().CanReclaim?();
+}
+
+int reclaimable(int workchain_id, int address) method_id {
+	slice src = begin_cell().store_int(workchain_id, 8).store_uint(address, 256).end_cell().begin_parse();
+	var data = Storage:Load();
+	if (data.[flags_pack]().CantReclaim?()) {
+		return 0;
+	}
+	(slice res, int f) = data.[investors]().dict_get?(264, src);
+	if (f) { 
+		return res~load_grams(); 
+	}
+	return 0;
+}

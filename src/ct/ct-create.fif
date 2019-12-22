@@ -1,0 +1,325 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #1: Conditional transfer smart contract (CTSC)                 |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+"TonUtil.fif" include
+"GetOpt.fif" include
+"Asm.fif" include
+"Color.fif" include
+{ ^red .s ^reset 255 halt } : ^ // inspect stack tool
+
+{ show-options-help 1 halt } : usage
+{ hole dup -rot ! } : defvar
+
+// Default values
+null defvar =: controller
+null defvar =: ctrlmode
+0 defvar =: min_grams
+0 defvar =: max_grams
+0 defvar =: min_accepted
+0 defvar =: collect_deadline
+0 defvar =: release_locktime
+0 defvar =: release_deadline
+0 defvar =: flags
+null defvar =: beneficiaries
+0 defvar =: beneficiary_wc
+0 defvar =: beneficiary_addr
+0 defvar =: time_base
+
+0 defvar =: ben_val
+0 defvar =: ben_pct
+
+false defvar =: force
+false defvar =: warn
+
+null defvar =: controller_key
+
+// Options 
+begin-options
+	      "[-e <keyfile-base> | -i <ctrl-addr> |] [-0 <min-grams>] [-9 <max-grams>] [-m <min-accepted>]" +cr
+	+tab +"[-c <collect-deadline>] [-l <release-locktime>] [-d <release-deadline>] [-n] [-a] [-r] [-b <ult-ben-addr>]" +cr
+	+tab +"[-V <grams> | -P <percents>] [-B <ben-addr-1>] [--ok] [...] -- <workchain-id> <filename-base>" +cr +cr
+	+tab +"Generates a conditional transfer smart-contract with provided configuration" +cr
+	+tab +"Creation request will be saved to <savefile>-create.boc (must be specified)." +cr
+	+tab +"Please refer to documentation (quick start) for detailed information about params" +cr
+	generic-help
+
+	"e" "--ext-ctrl" { ctrlmode @ null? { 1 abort"Controller already set" } ifnot 1 ctrlmode ! 
+	                   controller_key ! flags @ 1 or flags ! } short-long-option-arg
+	  "Specifies that external controller to be used, followed by keyfile basename" option-help
+	  
+	"i" "--int-ctrl" { ctrlmode @ null? { 1 abort"Controller already set" } ifnot 0 ctrlmode ! false parse-load-address
+	                   drop pair controller ! flags @ 1 or flags ! } short-long-option-arg
+	  "Specifies that internal controller to be used, followed by controller address" option-help
+	  
+	"0" "--min-grams" { $>GR min_grams ! } short-long-option-arg
+	  "Sets minimum amount of grams required to release funds" option-help
+	  
+	"9" "--max-grams" { $>GR max_grams ! } short-long-option-arg
+	  "Sets maximum amount of grams allowed to be stored in the contract" option-help
+	  
+	"m" "--min-accepted" { $>GR min_accepted ! } short-long-option-arg
+	  "Sets minimum amount of grams accepted in a single message" option-help
+	  
+	"c" "--collect-deadline" { parse-int collect_deadline ! } short-long-option-arg
+	  "Sets collection phase deadline time for the contract" option-help
+	  
+	"l" "--release-locktime" { parse-int release_locktime ! } short-long-option-arg
+	  "Sets locktime before which controller action (release/refund) is locked" option-help
+	
+	"d" "--release-deadline" { parse-int release_deadline ! } short-long-option-arg
+	  "Sets release deadline after which automatic refund or release (if -a set) is done" option-help
+	  
+	"b" "--ult-ben-addr" { false parse-load-address drop beneficiary_addr ! beneficiary_wc ! } short-long-option-arg
+	  "Specifies ultimate beneficiary address that receives remaining grams after other ben." option-help
+	  
+	"n" "--continuous-coll" { flags @ 4 or flags ! } short-long-option
+	  "Allows collecting of funds after collect-deadline before release or refind" option-help
+	  
+	"a" "--auto-release" { flags @ 2 or flags ! } short-long-option
+	  "Indicates that funds are automatically released after release-deadline (reclaimed if not set)" option-help
+	
+	"r" "--relative-time" { now time_base ! } short-long-option
+	  "Sets that -m -c -l times are relative to now and are not absolute unixtime values" option-help
+	  
+	"P" "--ben-pct" { $>GR 100000 / ben_pct ! 0 ben_val ! } short-long-option-arg
+	  "Sets that next beneficiary (-B parameter) should receive specified % from total sum" option-help
+	  
+	"V" "--ben-val" { $>GR ben_val ! 0 ben_pct ! } short-long-option-arg
+	  "Sets that next beneficiary (-B parameter) should received specified fixed amount of grams" option-help
+	  
+	"B" "--ben-addr" { false parse-load-address drop ben_val @ ben_pct @ 4 tuple 0 ben_pct !
+	                   beneficiaries @ swap cons beneficiaries ! 0 ben_val ! } short-long-option-arg
+	  "Adds a specified address with preset value or percent to beneficiaries list" option-help
+	  
+	"--ok" { true force ! } long-option "Ignore warnings arisen during parameter verification (DANGER!)" option-help
+parse-options
+
+$# 2 <> ' usage if
+$1 parse-workchain-id =: wc
+$2 =: file-base
+
+"ctsc.fif" file-exists? { ^red ."Error: contract code logic file ctsc.fif "
+	."is missing!" cr "ctsc.fc" file-exists? { ^magenta
+	."Because source code exists you should execute" cr 
+	^yellow ."    func ../stdlib.fc ctsc.fc -o ctsc.fif" ^magenta cr
+	."and then try calling this script again!" cr
+	} if ^reset 66 halt } ifnot
+
+// Load code
+PROGRAM{ "ctsc.fif" include }END>c =: Code
+
+collect_deadline @ dup 0 > { time_base @ + } if collect_deadline !
+release_locktime @ dup 0 > { time_base @ + } if release_locktime !
+release_deadline @ dup 0 > { time_base @ + } if release_deadline !
+
+{ dup ^yellow . dup 0 = { ^magenta ."(disabled)" } { 
+	dup now < { ^red ."([Warning] Already passed!)" drop true warn ! } { ^reset ."(in " now - ^cyan . ^reset ."seconds)" } cond
+} cond ^reset } : DescribeTime
+
+{ { ^green ."Activated" } { ^red ."Not activated" } cond ^reset } : DescribeFlag
+{ { ^yellow ."External message controlled" } { ^cyan ."Internal message controlled" } cond ^reset } : DescribeCtrl
+{ release_deadline @ 0 = { drop ^magenta ."Disabled" } { 
+  { ^green ."Automatic release" } { ^red ."Automatic refund" } cond } cond ^reset } : DescribeAR
+
+// Data building
+controller_key @ null? {
+	controller_key @ +".pk" load-generate-keypair drop controller !
+} ifnot
+  
+^yellow  ."<workchain-id>     " ^reset ."Contract workchain ident:    " ^cyan wc . cr ^reset
+^magenta ."[min-grams]        " ^reset ."Minimum grams required:      " ^yellow min_grams @ .GR cr ^reset
+^magenta ."[max-grams]        " ^reset ."Maximum total grams:         " ^yellow max_grams @ .GR cr ^reset
+^magenta ."[min-accepted]     " ^reset ."Minimum grams per message:   " ^yellow min_accepted @ .GR cr ^reset
+^magenta ."[collect-deadline] " ^reset ."Collection phase deadline:   " ^yellow collect_deadline @ DescribeTime cr ^reset
+^magenta ."[release-locktime] " ^reset ."Cntrl release locked until:  " ^yellow release_locktime @ DescribeTime cr ^reset
+^magenta ."[release-deadline] " ^reset ."Automatic action happens at: " ^yellow release_deadline @ DescribeTime cr ^reset
+^magenta ."[continuous-coll]  " ^reset ."Collection after deadline:   " flags @ 4 and DescribeFlag cr ^reset
+^magenta ."[auto-release]     " ^reset ."Action at release-deadline:  " flags @ 2 and DescribeAR cr ^reset
+^cyan ."[has-controller]   " ^reset ."Is controller used at all:   " flags @ 1 and DescribeFlag cr ^reset
+flags @ 1 and {
+	^cyan ."----[controller-type]  " ^reset ."Controller type:         " flags ctrlmode @ 1 = DescribeCtrl cr ^reset
+	ctrlmode @ 1 = {
+	^cyan ."----[public-key]       " ^reset ."Controller public key:   " flags controller @ ^cyan Bx. cr ^reset
+	} {
+	^cyan ."----[controller-addr]  " ^reset ."Controller address:      " flags controller @ ^yellow unpair .addr cr ^reset
+	} cond
+} if
+0 defvar =: bensum
+0 defvar =: benpct
+beneficiaries @ defvar =: ben2
+null
+{ ben2 @ null? not }
+{
+  ben2 @ uncons
+  swap ben2 !
+} while
+{ dup null? not }
+{
+^green ."[beneficiary]      " ^reset ."Beneficiary " ^yellow dup 0 [] over 1 [] .addr ^reset ."will receive "
+dup 2 [] 0 = 
+	{ dup 3 [] dup benpct @ + benpct ! ^cyan 100000 * (.GR) type ."%" ^reset } 
+	{ dup 2 [] dup bensum @ + bensum ! ^green .GR ^reset } cond
+dup 2 [] 0 = over 3 [] 0 = and { ^red ." [Warning!] Zero value and percent!" ^reset true warn ! } if
+drop cr } while drop
+^green ."[ult-ben-addr]     " ^reset ."Ultimate (last) beneficiary: " ^yellow beneficiary_wc @ beneficiary_addr @ .addr cr ^reset
+
+beneficiary_addr @ 0 = { ^yellow
+	."[Warning!] Ultimate beneficiary address is not set, all grams not distributed will be burned!!!"
+cr ^reset true warn ! } if
+
+benpct @ 1000000 > { ^yellow
+	."[Warning!] Beneficiary total percentage is higher than 100%, some beneficiaries and ultimate will miss sum!!!" 
+cr ^reset true warn ! } if
+
+bensum @ benpct @ min_grams @ * 1000000 / + dup min_grams @ > { ^yellow
+	."[Warning!] Total beneficiary amount based on min_grams percentage and fixed values " .GR ."is more than min_grams!!!"
+cr ^reset true warn ! 0 } if drop
+
+collect_deadline @ 0 <> release_locktime @ 0 <> and collect_deadline @ release_locktime @ > and { ^yellow
+	."[Warning!] Collect deadline is greater than release locktime, possible logic error."
+cr ^reset true warn ! 0 } if
+
+collect_deadline @ 0 <> release_deadline @ 0 <> and collect_deadline @ release_deadline @ > and { ^yellow
+	."[Warning!] Collect deadline is greater than release deadline, possible logic error."
+cr ^reset true warn ! 0 } if
+
+release_locktime @ 0 <> release_deadline @ 0 <> and release_locktime @ release_deadline @ > and { ^yellow
+	."[Warning!] Release locktime is greater than release deadline, possible logic error."
+cr ^reset true warn ! 0 } if
+
+min_grams @ 0 <> max_grams @ 0 <> and min_grams @ max_grams @ >= and { ^yellow
+	."[Warning!] Min grams is greater or equal than max grams, logic error imminent."
+cr ^reset true warn ! 0 } if
+
+min_accepted @ 0 <> min_grams @ 0 <> and min_accepted @ min_grams @ >= and { ^yellow
+	."[Warning!] Min accepted is greater or equal than min grams, logic error imminent."
+cr ^reset true warn ! 0 } if
+
+release_deadline @ 0 = ctrlmode @ null? and { ^yellow
+	collect_deadline @ 0 = {
+		."[Warning!] There is no controller and any deadline, funds will be stuck forever!"
+	} { 
+		."[Warning!] There is no controller and release deadline, funds will be stuck forever if min_grams is collected!"
+	} cond
+cr ^reset true warn ! 0 } if
+
+warn @ {
+	force @ {
+		^red ."Warnings are overriden! Continuing, but contract may not behave correctly, you have been warned!" cr ^reset
+	} { 
+		^red ."Warnings are detected, not continuing! If you know what you are doing use --ok to override!" cr ^reset 1 halt
+	} cond
+} if
+
+<b defvar =: ben_bld
+null defvar =: ben_chain
+null
+{ beneficiaries @ null? not }
+{
+  beneficiaries @ uncons
+  swap beneficiaries !
+} while
+{ dup null? not }
+{
+  <b over 0 [] 8 i,
+     over 1 [] 256 u,
+	 over 2 [] Gram,
+     over 2 [] 0 = {
+		over 3 [] 20 u, 
+	 } if 
+  nip
+  dup bbits swap b> swap
+  ben_bld @ brembits < {
+    <s ben_bld @ swap s, ben_bld ! 
+  } {
+    ben_chain @ ben_bld @ cons ben_chain !
+	<s <b swap s, ben_bld !
+  } cond
+} while drop
+ben_bld @ bbits 0 > {
+	ben_chain @ ben_bld @ cons ben_chain !
+} if
+null defvar =: ben_last
+	ben_chain @ null? {
+	ben_chain @ uncons b> ben_last ! ben_chain !
+	{ ben_chain @ null? not }
+	{ ben_chain @ uncons ben_last @ ref, b> ben_last ! ben_chain ! } while
+} ifnot
+
+// ben_last @ <s csr.
+
+<b 
+	min_grams @ Gram,  // min_grams
+	max_grams @ Gram,  // max_grams
+	min_accepted @ Gram,   // min_accepted
+	collect_deadline @ 32 u, // collect_deadline
+	release_locktime @ 32 u, // release_locktime
+	release_deadline @ 32 u, // release_deadline
+	0 3 u, // initialized destroyed can_reclaim
+	flags @ 3 u, // continuous_coll auto_release has_controller
+	null dict, // investors
+	ben_last @ dict, // beneficiaries
+	ctrlmode @ null? {
+		ctrlmode @ 1 u, // ext_controller
+		ctrlmode @ 0 = { // internal
+			controller @ unpair 
+			-rot 8 i, // controller_wc
+			swap 256 u, // controller_addr
+		} { // external
+			controller @ B, // controller_addr
+		} cond
+	} ifnot
+	beneficiary_wc @ 8 i, // beneficiary_wc
+	beneficiary_addr @ 256 u, // beneficiary_addr
+b> =: Data
+
+null =: Lib
+
+<b
+   b{0011} s, // 0 split_depth:nothing$0, 0 special:nothing$0
+   Code ref,  // 1 code:just$1 ^Cell,
+   Data ref,  // 1 data:just$1 ^Cell
+   Lib dict,  // 0 library:nothing$0 (Maybe ^Cell)
+b> constant StateInit
+
+wc StateInit hash 2constant ContractAddr
+
+<b 
+//  ext_in_msg_info$10
+//  ||src:MsgAddressExt addr_none$00
+//  ||||dest:MsgAddressInt addr_std$10
+//  ||||||anycast:(Maybe Anycast) nothing$0 {X:Type} = Maybe X;
+//  |||||||
+//  \/\/\/V
+  b{1000100} s,
+  ContractAddr addr, // workchain_id:int8 address:uint256 = MsgAddressInt;
+//   import_fee:Grams = CommonMsgInfo; 0000: zero length = zero
+//   || init:(Maybe (Either StateInit ^StateInit))
+//   || just$1 {X:Type} value:X = Maybe X;
+//   || |left$0 {X:Type} {Y:Type} value:X = Either X Y; (Selected StateInit)
+//   || ||
+//  \\//VV
+  b{000010} s,
+  StateInit <s s,
+  b{0} s, // body:(Either X ^X) = Message X; (Selected left$0: X)
+b> constant InitMessage
+
+InitMessage 2 boc+>B file-base +"-create.boc" B>file
+ContractAddr file-base +".addr" save-address
+
+cr ^green ."Creation query was saved to file: " ^yellow file-base type ."-create.boc" ^green ."!" cr ^reset
+^green ."Contract address saved to file: " ^yellow file-base type .".addr" ^green ."!" cr ^reset
+."First, send some (like 5-10) Grams to init address: " ^yellow ContractAddr 5 .Addr ^reset cr
+."Afterwards, you need to use lite-client to deploy contract to the network" cr
+."  For example, execute " ^green ."sendfile " file-base type ."-create.boc" ^reset ." in " ^blue ."lite-client" ^reset ." console!" cr 
+."To send Gram and commands to SC use normal address: " ^cyan ContractAddr 4 .Addr ^reset cr
+."You can use stock show-addr.fif script to redisplay address later." cr
+cr

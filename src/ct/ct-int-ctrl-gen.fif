@@ -1,0 +1,24 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #1: Conditional transfer smart contract (CTSC)                 |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+cr ."Generating messages for internal message controller..." cr
+
+<b 0x52656c65 32 u, b> 2 boc+>B "ct-int-ctrl-release.boc" B>file
+."Release query saved to ct-int-ctrl-release.boc!" cr
+
+<b 0x52636c6d 32 u, b> 2 boc+>B "ct-int-ctrl-reclaim.boc" B>file
+."Reclaim query saved to ct-int-ctrl-reclaim.boc!" cr
+
+cr
+
+."You can embed those queries with your wallet controlling script" cr
+."  (for example -B in stock wallet) and send them to CT SC!" cr
+cr

@@ -1,0 +1,737 @@
+// automatically generated from `../stdlib.fc` `ctsc.fc` 
+DECLPROC Storage:Load
+DECLPROC Storage:Save
+DECLPROC Message:Send
+DECLPROC Logic:DoRelease
+DECLPROC Controller:ReleaseFunds
+DECLPROC Controller:InitiateReclaim
+DECLPROC recv_internal
+DECLPROC recv_external
+103798 DECLMETHOD get_config
+118924 DECLMETHOD reclaiming
+87846 DECLMETHOD reclaimable
+Storage:Load PROCREF:<{
+  c4 PUSH
+  CTOS
+  LDGRAMS
+  LDGRAMS
+  LDGRAMS
+  32 LDU
+  32 LDU
+  32 LDU
+  6 LDU
+  LDDICT
+  LDDICT
+  0 PUSHINT
+  s0 s0 s4 PUSH3
+  1 PUSHINT AND
+  IF:<{
+    DROP
+    NIP
+    SWAP
+    1 LDU
+    OVER
+    0 EQINT
+    IF:<{
+      s2 POP
+      SWAP
+      8 LDI
+    }>ELSE<{
+      s1 s2 XCHG
+    }>
+    256 LDU
+  }>ELSE<{
+    3 ROLL
+  }>
+  8 LDI
+  256 LDU
+  ENDS
+  14 TUPLE
+}>
+Storage:Save PROCREF:<{
+  14 UNTUPLE
+  NEWC
+  s0 s14 XCHG2
+  STGRAMS
+  s0 s12 XCHG2
+  STGRAMS
+  s0 s10 XCHG2
+  STGRAMS
+  s1 s8 XCHG
+  32 STU
+  s1 s6 XCHG
+  32 STU
+  s1 s4 XCHG
+  32 STU
+  s2 s(-1) PUXC
+  6 STU
+  STDICT
+  s1 s2 XCHG
+  STDICT
+  SWAP
+  1 PUSHINT AND
+  IF:<{
+    s1 s(-1) PUXC
+    1 STU
+    SWAP
+    0 EQINT
+    IF:<{
+      8 STI
+    }>ELSE<{
+      NIP
+    }>
+    256 STU
+  }>ELSE<{
+    s0 s3 XCHG
+    3 BLKDROP
+  }>
+  8 STI
+  256 STU
+  ENDC
+  c4 POP
+}>
+Message:Send PROCREF:<{
+  0 PUSHINT
+  132 PUSHINT
+  NEWC
+  9 STU
+  s1 s5 XCHG
+  8 STI
+  s1 s3 XCHG
+  256 STU
+  SWAP
+  STGRAMS
+  s1 s2 XCHG
+  107 STU
+  ENDC
+  2 PUSHINT
+  s1 s2 XCHG
+  OR
+  SENDRAWMSG
+}>
+Logic:DoRelease PROC:<{
+  DUP
+  6 INDEX
+  DUP
+  8 PUSHINT AND
+  35 THROWIF
+  ACCEPT
+  32 PUSHINT
+  OR
+  6 SETINDEX
+  DUP
+  8 INDEX
+  PUSHNULL
+  s1 s2 XCHG
+  7 SETINDEX
+  PUSHNULL
+  8 SETINDEX
+  DUP
+  Storage:Save INLINECALLDICT
+  COMMIT
+  BALANCE
+  CAR
+  DUP
+  132 PUSHINT
+  NEWC
+  9 STU
+  s4 PUSH
+  ISNULL
+  NOT
+  IF:<{
+    s0 s4 XCHG
+    CTOS
+    WHILE:<{
+      DUP
+      SBITS
+    }>DO<{
+      8 LDI
+      256 LDU
+      LDGRAMS
+      OVER
+      0 EQINT
+      IF:<{
+        20 LDU
+        OVER
+        1000000 PUSHINT
+        LESS
+        IF:<{
+          s2 POP
+          s5 s(-1) PUXC
+          MUL
+          1000000 PUSHINT
+          DIV
+        }>ELSE<{
+          -ROT
+          DROP
+        }>
+      }>ELSE<{
+        SWAP
+      }>
+      s4 PUSH
+      MIN
+      DUP
+      0 GTINT
+      IF:<{
+        0 PUSHINT
+        s4 s8 XCPU
+        8 STI
+        s1 s3 XCHG
+        256 STU
+        s2 PUSH
+        STGRAMS
+        s1 s3 XCHG
+        107 STU
+        ENDC
+        2 PUSHINT
+        SENDRAWMSG
+        s1 s2 XCHG
+        SUB
+      }>ELSE<{
+        s1 s4 XCHG
+        s1 s3 XCHG
+        3 BLKDROP
+      }>
+      OVER
+      SBITS
+      0 EQINT
+      s2 PUSH
+      SREFS
+      0 GTINT
+      AND
+      IF:<{
+        SWAP
+        LDREF
+        DROP
+        CTOS
+      }>ELSE<{
+        SWAP
+      }>
+    }>
+    s3 s4 XCHG
+    4 BLKDROP
+  }>ELSE<{
+    s3 s4 XCHG
+    4 BLKDROP
+  }>
+  DUP
+  12 INDEX
+  SWAP
+  13 INDEX
+  0 PUSHINT
+  128 PUSHINT
+  Message:Send INLINECALLDICT
+}>
+Controller:ReleaseFunds PROC:<{
+  OVER
+  3 INDEX
+  s1 s(-1) PUXC
+  LESS
+  31 THROWIF
+  OVER
+  4 INDEX
+  s1 s(-1) PUXC
+  LESS
+  32 THROWIF
+  OVER
+  5 INDEX
+  0 NEQINT
+  s2 PUSH
+  5 INDEX
+  s1 s2 XCHG
+  GEQ
+  AND
+  33 THROWIF
+  DUP
+  6 INDEX
+  8 PUSHINT AND
+  34 THROWIF
+  BALANCE
+  CAR
+  OVER
+  0 INDEX
+  LESS
+  36 THROWIF
+  DUP
+  9 INDEX
+  IF:<{
+    ACCEPT
+  }>
+  Logic:DoRelease CALLDICT
+}>
+Controller:InitiateReclaim PROC:<{
+  OVER
+  3 INDEX
+  s1 s(-1) PUXC
+  LESS
+  31 THROWIF
+  OVER
+  4 INDEX
+  s1 s(-1) PUXC
+  LESS
+  32 THROWIF
+  OVER
+  5 INDEX
+  0 NEQINT
+  s2 PUSH
+  5 INDEX
+  s1 s2 XCHG
+  GEQ
+  AND
+  33 THROWIF
+  DUP
+  9 INDEX
+  IF:<{
+    ACCEPT
+  }>
+  DUP
+  6 INDEX
+  8 PUSHINT
+  OR
+  6 SETINDEX
+  PUSHNULL
+  8 SETINDEX
+  Storage:Save INLINECALLDICT
+}>
+recv_internal PROC:<{
+  Storage:Load INLINECALLDICT
+  DUP
+  6 INDEX
+  DUP
+  32 PUSHINT AND
+  IFJMP:<{
+    s1 s4 XCHG
+    4 BLKDROP
+    ACCEPT
+    DUP
+    12 INDEX
+    SWAP
+    13 INDEX
+    0 PUSHINT
+    128 PUSHINT
+    Message:Send INLINECALLDICT
+  }>
+  s0 s3 XCHG
+  CTOS
+  4 LDU
+  SWAP
+  1 PUSHINT
+  AND
+  IFJMP:<{
+    5 BLKDROP
+  }>
+  LDMSGADDR
+  DROP
+  DUP
+  REWRITESTDADDR
+  NOW
+  BALANCE
+  CAR
+  s8 PUSH
+  SUB
+  s5 PUSH
+  3 INDEX
+  s6 PUSH
+  5 INDEX
+  s9 PUSH
+  8 PUSHINT AND ISZERO
+  s2 PUSH
+  0 GTINT
+  AND
+  s4 s2 PUSH2
+  GEQ
+  AND
+  s8 PUSH
+  0 INDEX
+  s4 s(-1) PUXC
+  LESS
+  AND
+  IF:<{
+    8 PUSHINT
+    s1 s10 XCHG
+    OR
+    s7 s7 XCPU
+    6 SETINDEX
+    PUSHNULL
+    8 SETINDEX
+    DUP
+    Storage:Save INLINECALLDICT
+  }>ELSE<{
+    s0 s9 XCHG
+    s0 s7 XCHG
+  }>
+  s7 PUSH
+  2 PUSHINT AND
+  s8 PUSH
+  8 PUSHINT AND ISZERO
+  AND
+  s10 PUSH
+  0 GTINT
+  AND
+  s4 s10 PUSH2
+  GEQ
+  AND
+  OVER
+  0 INDEX
+  s4 s(-1) PUXC
+  GEQ
+  AND
+  IFJMP:<{
+    s0 s10 XCHG
+    10 BLKDROP
+    Logic:DoRelease CALLDICT
+  }>
+  s0 s6 XCHG
+  3 LDU
+  SWAP
+  5 EQINT
+  IF:<{
+    DROP
+    s4 PUSH
+    NEWC
+    8 STI
+    s4 s(-1) PUXC
+    256 STU
+    ENDC
+    CTOS
+  }>
+  s6 PUSH
+  11 INDEX
+  s7 PUSH
+  10 INDEX
+  0 PUSHINT
+  s11 PUSH
+  SBITS
+  31 GTINT
+  IF:<{
+    DROP
+    s0 s10 XCHG
+    32 LDU
+  }>ELSE<{
+    s0 s11 XCHG2
+  }>
+  s2 PUSH
+  0 NEQINT
+  s10 PUSH
+  9 INDEX
+  0 EQINT
+  AND
+  s11 PUSH
+  8 PUSHINT AND ISZERO
+  AND
+  s9 s12 PUXC
+  EQUAL
+  s1 s12 XCHG
+  AND
+  s7 s2 PUXC
+  EQUAL
+  s1 s2 XCHG
+  AND
+  IFJMP:<{
+    s0 s3 XCHG
+    3 BLKDROP
+    s5 POP
+    s5 POP
+    s5 POP
+    s5 POP
+    0 PUSHINT
+    64 PUSHINT
+    s3 s6 XCHG
+    s2 s5 XCHG
+    Message:Send INLINECALLDICT
+    s2 PUSH
+    1382378597 PUSHINT
+    EQUAL
+    IF:<{
+      s2 POP
+      SWAP
+      Controller:ReleaseFunds CALLDICT
+    }>ELSE<{
+      1382247533 PUSHINT
+      s1 s3 XCHG
+      EQUAL
+      IF:<{
+        SWAP
+        Controller:InitiateReclaim CALLDICT
+      }>ELSE<{
+        2DROP
+      }>
+    }>
+  }>
+  s8 PUSH
+  2 PUSHINT AND ISZERO
+  s9 PUSH
+  8 PUSHINT AND ISZERO
+  AND
+  s11 PUSH
+  0 GTINT
+  AND
+  s5 s11 PUXC
+  GEQ
+  s1 s11 XCHG
+  AND
+  IF:<{
+    8 PUSHINT
+    s1 s8 XCHG
+    OR
+    s6 s6 XCPU
+    6 SETINDEX
+    PUSHNULL
+    8 SETINDEX
+    DUP
+    Storage:Save INLINECALLDICT
+    COMMIT
+  }>ELSE<{
+    s0 s7 XCHG
+    s0 s6 XCHG
+  }>
+  DUP
+  7 INDEX
+  s7 PUSH
+  8 PUSHINT AND
+  IFJMP:<{
+    s2 POP
+    s2 POP
+    s2 POP
+    s4 POP
+    s5 POP
+    s5 POP
+    s5 POP
+    s1 s2 PUSH2
+    264 PUSHINT
+    DICTGET
+    NULLSWAPIFNOT
+    NOT
+    IFJMP:<{
+      4 BLKDROP
+      0 PUSHINT
+      64 PUSHINT
+      Message:Send INLINECALLDICT
+    }>
+    s2 s3 XCHG2
+    264 PUSHINT
+    DICTDEL
+    DROP
+    s0 s2 XCHG
+    LDGRAMS
+    DROP
+    64 PUSHINT
+    s3 s5 XCHG
+    s2 s4 XCHG
+    Message:Send INLINECALLDICT
+    SWAP
+    7 SETINDEX
+    Storage:Save INLINECALLDICT
+  }>
+  5000000000 PUSHINT
+  1197568811 PUSHINT
+  s1 s12 XCHG
+  EQUAL
+  IF:<{
+    s0 s9 XCHG
+    LDGRAMS
+    DROP
+    s1 s10 XCHG
+    MAX
+  }>ELSE<{
+    s10 s9 XCHG2
+    DROP
+  }>
+  s1 s10 XCHG
+  SUB
+  s8 PUSH
+  2 INDEX
+  s1 s(-1) PUXC
+  LESS
+  IFJMP:<{
+    3 BLKDROP
+    s2 POP
+    s2 POP
+    s2 POP
+    s2 POP
+    s2 POP
+    0 PUSHINT
+    64 PUSHINT
+    s2 s3 XCHG
+    Message:Send INLINECALLDICT
+  }>
+  s9 PUSH
+  0 NEQINT
+  s3 s10 XCHG2
+  GEQ
+  s1 s9 XCHG
+  AND
+  s0 s4 XCHG
+  4 PUSHINT AND ISZERO
+  s1 s4 XCHG
+  AND
+  IFJMP:<{
+    s2 POP
+    s2 POP
+    s2 POP
+    s2 POP
+    s2 POP
+    0 PUSHINT
+    64 PUSHINT
+    s2 s3 XCHG
+    Message:Send INLINECALLDICT
+  }>
+  s5 PUSH
+  1 INDEX
+  DUP
+  0 GTINT
+  s8 s4 PUSH2
+  ADD
+  s2 PUSH
+  GREATER
+  AND
+  IF:<{
+    s3 POP
+    s2 s6 XCPU
+    SUB
+  }>ELSE<{
+    s1 s3 XCHG
+    DROP
+  }>
+  DUP
+  0 EQINT
+  IFJMP:<{
+    DROP
+    s2 POP
+    s2 POP
+    s2 POP
+    s2 POP
+    0 PUSHINT
+    64 PUSHINT
+    s2 s3 XCHG
+    Message:Send INLINECALLDICT
+  }>
+  0 PUSHINT
+  s4 s5 PUSH2
+  264 PUSHINT
+  DICTGET
+  NULLSWAPIFNOT
+  IF:<{
+    NIP
+    LDGRAMS
+    DROP
+  }>ELSE<{
+    DROP
+  }>
+  OVER
+  ADD
+  NEWC
+  SWAP
+  STGRAMS
+  s0 s4 s5 XCHG3
+  264 PUSHINT
+  DICTSETB
+  s1 s4 XCHG
+  7 SETINDEX
+  Storage:Save INLINECALLDICT
+  s1 s3 XCHG
+  ADD
+  0 PUSHINT
+  RAWRESERVE
+  0 PUSHINT
+  128 PUSHINT
+  Message:Send INLINECALLDICT
+}>
+recv_external PROC:<{
+  Storage:Load INLINECALLDICT
+  DUP
+  6 INDEX
+  DUP
+  32 PUSHINT AND
+  IFJMP:<{
+    DROP
+    NIP
+    ACCEPT
+    DUP
+    12 INDEX
+    SWAP
+    13 INDEX
+    0 PUSHINT
+    128 PUSHINT
+    Message:Send INLINECALLDICT
+  }>
+  DUP
+  16 PUSHINT AND ISZERO
+  IFJMP:<{
+    s2 POP
+    ACCEPT
+    16 PUSHINT
+    s1 s2 XCHG
+    OR
+    6 SETINDEX
+    Storage:Save INLINECALLDICT
+  }>
+  DROP
+  DUP
+  9 INDEX
+  41 THROWIFNOT
+  SWAP
+  9 PUSHPOW2
+  LDSLICEX
+  DUP
+  HASHSU
+  s3 PUSH
+  11 INDEX
+  s1 s3 s0 XCHG3
+  CHKSIGNU
+  42 THROWIFNOT
+  NOW
+  SWAP
+  32 LDU
+  DROP
+  DUP
+  1382378597 PUSHINT
+  EQUAL
+  IF:<{
+    DROP
+    Controller:ReleaseFunds CALLDICT
+  }>ELSE<{
+    1382247533 PUSHINT
+    EQUAL
+    IF:<{
+      Controller:InitiateReclaim CALLDICT
+    }>ELSE<{
+      2DROP
+      30 THROW
+    }>
+  }>
+}>
+get_config PROC:<{
+  Storage:Load INLINECALLDICT
+}>
+reclaiming PROC:<{
+  Storage:Load INLINECALLDICT
+  6 INDEX
+  8 PUSHINT AND
+}>
+reclaimable PROC:<{
+  NEWC
+  s1 s2 XCHG
+  8 STI
+  256 STU
+  ENDC
+  CTOS
+  Storage:Load INLINECALLDICT
+  DUP
+  6 INDEX
+  8 PUSHINT AND ISZERO
+  IFJMP:<{
+    2DROP
+    0 PUSHINT
+  }>
+  7 INDEX
+  264 PUSHINT
+  DICTGET
+  NULLSWAPIFNOT
+  IFJMP:<{
+    LDGRAMS
+    DROP
+  }>
+  DROP
+  0 PUSHINT
+}>

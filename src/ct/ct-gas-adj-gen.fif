@@ -1,0 +1,30 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #1: Conditional transfer smart contract (CTSC)                 |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+"TonUtil.fif" include
+
+$# 1 <> { ."Usage: ct-gas-adj-gen.fif <reserved-grams>" cr
+."Generates a embeddable BoC that adjusts amount of grams reserved for gas." cr
+."Must be used if default amount of 5 grams is not enough due to huge data tree." cr 1 halt } if
+
+$1 $>GR =: reserved
+reserved GR$5 <= {
+	1 abort"Requested value must be higher than 5 Gram (default)"
+} if
+
+cr ."Generating message with adjusted reserved grams for gas..." cr
+
+<b 0x4761732b 32 u, reserved Gram, b> 2 boc+>B "ct-gas-" reserved (.GR) $+ +"g.boc" dup =: FileName B>file
+."Adjusted gas query saved to " FileName type cr cr
+
+."You can embed this query with your wallet controlling script" cr
+."  (for example -B in stock wallet) and send it to CT SC!" cr
+cr

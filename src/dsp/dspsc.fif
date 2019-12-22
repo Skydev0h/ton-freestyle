@@ -1,0 +1,832 @@
+// automatically generated from `../stdlib.fc` `dspsc.fc` 
+DECLPROC Storage:Load
+DECLPROC Storage:Save
+DECLPROC Box:Load
+DECLPROC Box:Save
+DECLPROC Box:Store
+DECLPROC Box:Configure
+DECLPROC Message:Send
+DECLPROC Slice:Lengths
+DECLPROC recv_internal
+DECLPROC recv_external
+85143 DECLMETHOD seqno
+DECLPROC get_box_internal
+103058 DECLMETHOD get_box
+84154 DECLMETHOD get_box_value
+Storage:Load PROCREF:<{
+  c4 PUSH
+  CTOS
+  7 LDU
+  LDDICT
+  32 LDU
+  256 LDU
+  24 LDU
+  0 PUSHINT
+  s0 s6 PUSH2
+  1 PUSHINT AND
+  IF:<{
+    2DROP
+    24 LDU
+    32 LDU
+  }>ELSE<{
+    ROT
+  }>
+  ENDS
+  7 TUPLE
+}>
+Storage:Save PROCREF:<{
+  7 UNTUPLE
+  s6 PUSH
+  NEWC
+  7 STU
+  s1 s6 XCHG
+  STDICT
+  s1 s4 XCHG
+  32 STU
+  s1 s2 XCHG
+  256 STU
+  24 STU
+  s0 s3 XCHG
+  1 PUSHINT AND
+  IF:<{
+    ROT
+    24 STU
+    32 STU
+  }>ELSE<{
+    2DROP
+  }>
+  ENDC
+  c4 POP
+}>
+Box:Load PROC:<{
+  8 LDU
+  0 PUSHINT
+  s0 s2 PUSH2
+  1 PUSHINT AND
+  IF:<{
+    2DROP
+    8 LDI
+    256 LDU
+  }>ELSE<{
+    ROT
+  }>
+  0 PUSHINT
+  s0 s4 PUSH2
+  4 PUSHINT AND
+  IF:<{
+    2DROP
+    LDGRAMS
+    LDGRAMS
+  }>ELSE<{
+    ROT
+  }>
+  0 PUSHINT
+  s6 PUSH
+  128 PUSHINT AND
+  IF:<{
+    DROP
+    32 LDU
+  }>ELSE<{
+    SWAP
+  }>
+  LDREF
+  DROP
+  7 TUPLE
+}>
+Box:Save PROCREF:<{
+  7 UNTUPLE
+  s6 PUSH
+  NEWC
+  8 STU
+  s7 PUSH
+  1 PUSHINT AND
+  IF:<{
+    s1 s6 XCHG
+    8 STI
+    s1 s4 XCHG
+    256 STU
+  }>ELSE<{
+    s0 s6 s5 XCHG3
+    2DROP
+  }>
+  s5 PUSH
+  4 PUSHINT AND
+  IF:<{
+    ROT
+    STGRAMS
+    SWAP
+    STGRAMS
+  }>ELSE<{
+    s2 POP
+    DROP
+  }>
+  s0 s3 XCHG
+  128 PUSHINT AND
+  IF:<{
+    ROT
+    32 STU
+  }>ELSE<{
+    s1 s2 XCHG
+    DROP
+  }>
+  STREF
+  ENDC
+  CTOS
+}>
+Box:Store PROCREF:<{
+  s0 s3 XCHG
+  Box:Save INLINECALLDICT
+  2SWAP
+  10 PUSHPOW2DEC
+  PFXDICTSET
+  31 THROWIFNOT
+  1 SETINDEX
+  Storage:Save INLINECALLDICT
+}>
+Box:Configure PROC:<{
+  SWAP
+  8 LDU
+  8 LDU
+  s2 s1 PUSH2
+  AND
+  51 THROWIF
+  s2 s1 PUSH2
+  OR
+  s5 PUSH
+  0 INDEX
+  OVER
+  138 PUSHINT
+  AND
+  52 THROWIF
+  s5 PUSH
+  0 EQINT
+  IF:<{
+    OVER
+    143 PUSHINT
+    AND
+    52 THROWIF
+  }>
+  DUP
+  8 PUSHINT AND
+  0 NEQINT
+  s6 PUSH
+  AND
+  IF:<{
+    s4 PUSH
+    4 PUSHINT
+    AND
+    0 NEQINT
+    OVER
+    4 PUSHINT
+    AND
+    0 EQINT
+    AND
+    52 THROWIF
+    1 PUSHINT
+    s1 s2 XCHG
+    AND
+    52 THROWIF
+    s2 PUSH
+    112 PUSHINT
+    AND
+    52 THROWIF
+  }>ELSE<{
+    NIP
+  }>
+  8 PUSHPOW2DEC
+  s0 s3 XCHG2
+  SUB
+  s3 s(-1) PUXC
+  AND
+  s1 s2 XCHG
+  OR
+  s4 s4 XCPU
+  0 SETINDEX
+  s2 PUSH
+  1 PUSHINT AND
+  IF:<{
+    SWAP
+    8 LDI
+    256 LDU
+    2SWAP
+    1 SETINDEX
+    ROT
+    2 SETINDEX
+  }>
+  s0 s2 XCHG
+  4 PUSHINT AND
+  IF:<{
+    LDGRAMS
+    LDGRAMS
+    DROP
+    s0 s4 XCHG
+    8 PUSHINT AND
+    0 NEQINT
+    s0 s3 XCHG2
+    AND
+    IF:<{
+      DUP
+      3 INDEX
+      s2 s(-1) PUXC
+      LESS
+      s2 PUSH
+      0 NEQINT
+      AND
+      53 THROWIF
+      DUP
+      4 INDEX
+      s3 s(-1) PUXC
+      LESS
+      s3 PUSH
+      0 NEQINT
+      AND
+      53 THROWIF
+      OVER
+      0 GTINT
+      OVER
+      3 INDEX
+      0 EQINT
+      AND
+      53 THROWIF
+      s2 PUSH
+      0 GTINT
+      OVER
+      4 INDEX
+      0 EQINT
+      AND
+      53 THROWIF
+    }>
+    SWAP
+    3 SETINDEX
+    SWAP
+    4 SETINDEX
+  }>ELSE<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+}>
+Message:Send PROC:<{
+  0 PUSHINT
+  132 PUSHINT
+  NEWC
+  9 STU
+  s1 s8 XCHG
+  8 STI
+  s1 s6 XCHG
+  256 STU
+  s0 s4 XCHG2
+  STGRAMS
+  s1 s5 XCHG
+  107 STU
+  s0 s4 XCHG2
+  STSLICER
+  STREF
+  OVER
+  ISNULL
+  0 EQINT
+  IF:<{
+    SWAP
+    STSLICER
+  }>ELSE<{
+    NIP
+  }>
+  ENDC
+  2 PUSHINT
+  s1 s2 XCHG
+  OR
+  SENDRAWMSG
+}>
+Slice:Lengths PROC:<{
+  1 PUSHINT
+  OVER
+  SBITS
+  WHILE:<{
+    s2 PUSH
+    SREFS
+  }>DO<{
+    s0 s2 XCHG
+    LDREF
+    SWAP
+    CTOS
+    Slice:Lengths CALLDICT
+    s3 s3 XCHG2
+    ADD
+    2SWAP
+    ADD
+  }>
+  s2 POP
+  SWAP
+}>
+recv_internal PROC:<{
+  s2 POP
+  CTOS
+  4 LDU
+  SWAP
+  1 PUSHINT
+  AND
+  IFJMP:<{
+    2DROP
+  }>
+  LDMSGADDR
+  DROP
+  REWRITESTDADDR
+  Storage:Load INLINECALLDICT
+  s3 PUSH
+  SBITS
+  32 LESSINT
+  IFJMP:<{
+    4 BLKDROP
+  }>
+  s0 s3 XCHG
+  32 LDU
+  OVER
+  0 EQINT
+  IFJMP:<{
+    5 BLKDROP
+  }>
+  LDREF
+  SWAP
+  CTOS
+  s5 PUSH
+  1 INDEX
+  TUCK
+  10 PUSHPOW2DEC
+  PFXDICTGETQ
+  NULLSWAPIFNOT
+  NULLSWAPIFNOT
+  44 THROWIFNOT
+  SEMPTY
+  45 THROWIFNOT
+  Box:Load CALLDICT
+  DUP
+  0 INDEX
+  PUSHNULL
+  s6 PUSH
+  1768845685 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s3 POP
+    s3 POP
+    s4 POP
+    s6 POP
+    16 PUSHINT AND
+    33 THROWIFNOT
+    0 PUSHINT
+    64 PUSHINT
+    s0 s3 XCHG
+    6 INDEX
+    s5 s6 XCHG
+    s4 s5 XCHG
+    s0 s4 XCHG2
+    Message:Send CALLDICT
+  }>
+  DROP
+  s5 PUSH
+  1886547832 PUSHINT
+  EQUAL
+  IF:<{
+    DUP
+    32 PUSHINT AND
+    33 THROWIFNOT
+    s0 s4 XCHG
+    8 LDI
+    256 LDU
+    1 LDU
+    NIP
+    LDREF
+    SWAP
+    CTOS
+    SWAP
+    LDREF
+    SWAP
+    CTOS
+    0 PUSHINT
+    64 PUSHINT
+    s7 PUSH
+    6 INDEX
+    s6 s7 XCHG
+    s5 s7 XCHG
+    s4 s3 s0 XCHG3
+    s2 s7 XCHG
+    SWAP
+    Message:Send CALLDICT
+  }>ELSE<{
+    s0 s4 XCHG
+  }>
+  s4 PUSH
+  2 PUSHINT AND
+  39 THROWIF
+  s4 PUSH
+  1 PUSHINT AND
+  32 THROWIFNOT
+  OVER
+  1 INDEX
+  s0 s8 XCHG2
+  NEQ
+  32 THROWIF
+  DUP
+  2 INDEX
+  s0 s6 XCHG2
+  NEQ
+  32 THROWIF
+  s3 PUSH
+  1651729780 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s3 POP
+    s0 s4 XCHG
+    LDREF
+    DROP
+    SWAP
+    4 PUSHINT AND
+    IF:<{
+      DUP
+      CTOS
+      Slice:Lengths CALLDICT
+      s4 PUSH
+      3 INDEX
+      s5 PUSH
+      4 INDEX
+      OVER
+      0 GTINT
+      s4 s2 XCHG2
+      GREATER
+      AND
+      48 THROWIF
+      OVER
+      0 GTINT
+      s0 s2 XCHG
+      GREATER
+      AND
+      49 THROWIF
+    }>
+    s1 s2 XCHG
+    6 SETINDEX
+    s3 s3 XCHG2
+    Box:Store INLINECALLDICT
+  }>
+  s3 PUSH
+  1650681447 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s2 POP
+    s2 POP
+    s2 s3 XCHG2
+    TRUE
+    Box:Configure CALLDICT
+    s1 s3 s3 XCHG3
+    Box:Store INLINECALLDICT
+  }>
+  2DROP
+  s3 POP
+  DUP
+  1886547828 PUSHINT
+  EQUAL
+  IFJMP:<{
+    DROP
+    OVER
+    128 PUSHINT AND
+    46 THROWIFNOT
+    127 PUSHINT
+    s1 s2 XCHG
+    AND
+    0 SETINDEX
+    DROP
+    Storage:Save INLINECALLDICT
+  }>
+  1970172018 PUSHINT
+  EQUAL
+  IFJMP:<{
+    127 PUSHINT
+    s1 s2 XCHG
+    AND
+    247 PUSHINT
+    AND
+    0 SETINDEX
+    DROP
+    Storage:Save INLINECALLDICT
+  }>
+  3 BLKDROP
+}>
+recv_external PROC:<{
+  NOW
+  Storage:Load INLINECALLDICT
+  DUP
+  0 INDEX
+  s0 s3 XCHG
+  9 PUSHPOW2
+  LDSLICEX
+  DUP
+  HASHSU
+  s3 PUSH
+  3 INDEX
+  s1 s3 s0 XCHG3
+  CHKSIGNU
+  42 THROWIFNOT
+  32 LDU
+  s2 PUSH
+  2 INDEX
+  s2 s(-1) PUXC
+  EQUAL
+  43 THROWIFNOT
+  ACCEPT
+  SWAP
+  INC
+  s1 s2 XCHG
+  2 SETINDEX
+  DUP
+  Storage:Save INLINECALLDICT
+  COMMIT
+  SWAP
+  32 LDU
+  OVER
+  0 EQINT
+  IFJMP:<{
+    5 BLKDROP
+  }>
+  OVER
+  1667788663 PUSHINT
+  EQUAL
+  IFJMP:<{
+    NIP
+    s2 POP
+    s2 POP
+    256 LDU
+    DROP
+    3 SETINDEX
+    Storage:Save INLINECALLDICT
+  }>
+  OVER
+  1667786354 PUSHINT
+  EQUAL
+  IFJMP:<{
+    NIP
+    24 LDU
+    DROP
+    s3 PUSH
+    1 PUSHINT AND
+    IFJMP:<{
+      OVER
+      5 INDEX
+      SWAP
+      EQUAL
+      45 THROWIFNOT
+      DUP
+      6 INDEX
+      s1 s2 XCHG
+      GEQ
+      44 THROWIFNOT
+      126 PUSHINT
+      s1 s2 XCHG
+      AND
+      0 SETINDEX
+      DUP
+      5 INDEX
+      4 SETINDEX
+      Storage:Save INLINECALLDICT
+    }>
+    1 PUSHINT
+    s1 s4 XCHG
+    OR
+    0 SETINDEX
+    s2 PUSH
+    5 SETINDEX
+    DUP
+    4 INDEX
+    DUP
+    0 EQINT
+    IF:<{
+      DROP
+      604800 PUSHINT
+      s0 s3 XCHG2
+      SUB
+    }>ELSE<{
+      s0 s3 XCHG2
+      DROP
+    }>
+    86400 PUSHINT
+    SWAP
+    MAX
+    ADD
+    6 SETINDEX
+    Storage:Save INLINECALLDICT
+  }>
+  s4 POP
+  s0 s3 XCHG
+  LDREF
+  SWAP
+  CTOS
+  s2 PUSH
+  1 INDEX
+  TUCK
+  10 PUSHPOW2DEC
+  PFXDICTGETQ
+  NULLSWAPIFNOT
+  NULLSWAPIFNOT
+  s8 PUSH
+  1651402103 PUSHINT
+  EQUAL
+  IFJMP:<{
+    NIP
+    NIP
+    s5 POP
+    s5 POP
+    s0 s3 XCHG
+    44 THROWIF
+    0 PUSHINT
+    s0 s0 s0 PUSH3
+    s0 s0 PUSH2
+    NEWC
+    ENDC
+    7 TUPLE
+    SWAP
+    TRUE
+    Box:Configure CALLDICT
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  44 THROWIFNOT
+  SEMPTY
+  45 THROWIFNOT
+  Box:Load CALLDICT
+  DUP
+  0 INDEX
+  s7 PUSH
+  1952997751 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s4 POP
+    s5 POP
+    s5 POP
+    OVER
+    2 PUSHINT AND
+    39 THROWIFNOT
+    253 PUSHINT
+    s1 s2 XCHG
+    AND
+    s1 s3 XCHG
+    0 SETINDEX
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  DUP
+  2 PUSHINT AND
+  39 THROWIF
+  s7 PUSH
+  1718773107 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s4 POP
+    s6 POP
+    s2 PUSH
+    128 PUSHINT AND
+    IFJMP:<{
+      2DROP
+      s3 PUSH
+      5 INDEX
+      s1 s3 XCHG
+      GEQ
+      47 THROWIFNOT
+      127 PUSHINT
+      s1 s2 XCHG
+      AND
+      247 PUSHINT
+      AND
+      s1 s2 XCHG
+      0 SETINDEX
+      DROP
+      Storage:Save INLINECALLDICT
+    }>
+    s3 PUSH
+    4 INDEX
+    0 GTINT
+    46 THROWIFNOT
+    128 PUSHINT
+    s1 s3 XCHG
+    OR
+    s1 s5 XCHG
+    0 SETINDEX
+    s2 PUSH
+    4 INDEX
+    s1 s4 XCHG
+    ADD
+    s1 s3 XCHG
+    5 SETINDEX
+    s3 s1 s3 XCHG3
+    Box:Store INLINECALLDICT
+  }>
+  s6 POP
+  s6 PUSH
+  1650681447 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s5 POP
+    s5 POP
+    s3 s3 XCHG2
+    TRUE
+    Box:Configure CALLDICT
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  s5 PUSH
+  8 PUSHINT AND
+  38 THROWIF
+  s6 PUSH
+  1650746732 PUSHINT
+  EQUAL
+  IFJMP:<{
+    DROP
+    s2 POP
+    s3 POP
+    s3 POP
+    -ROT
+    10 PUSHPOW2DEC
+    PFXDICTDEL
+    31 THROWIFNOT
+    1 SETINDEX
+    Storage:Save INLINECALLDICT
+  }>
+  s6 PUSH
+  1718778490 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s3 POP
+    s5 POP
+    2 PUSHINT
+    s1 s4 XCHG
+    OR
+    0 SETINDEX
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  s6 PUSH
+  1886547828 PUSHINT
+  EQUAL
+  IFJMP:<{
+    s3 POP
+    s5 POP
+    s3 PUSH
+    1 PUSHINT AND
+    38 THROWIFNOT
+    8 PUSHINT
+    s1 s4 XCHG
+    OR
+    0 SETINDEX
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  s5 POP
+  1651729780 PUSHINT
+  s1 s6 XCHG
+  EQUAL
+  IFJMP:<{
+    SWAP
+    LDREF
+    DROP
+    s1 s3 XCHG
+    6 SETINDEX
+    s0 s3 XCHG
+    Box:Store INLINECALLDICT
+  }>
+  5 BLKDROP
+  40 THROW
+}>
+seqno PROC:<{
+  Storage:Load INLINECALLDICT
+  2 INDEX
+}>
+get_box_internal PROC:<{
+  Storage:Load INLINECALLDICT
+  1 INDEX
+  s1 s2 XCHG
+  10 PUSHPOW2DEC
+  PFXDICTGETQ
+  NULLSWAPIFNOT
+  NULLSWAPIFNOT
+  s3 POP
+  s0 s2 XCHG
+  44 THROWIFNOT
+  SWAP
+  SEMPTY
+  45 THROWIFNOT
+  Box:Load CALLDICT
+  SWAP
+  0 EQINT
+  IF:<{
+    PUSHNULL
+    6 SETINDEX
+  }>
+}>
+get_box PROC:<{
+  FALSE
+  get_box_internal CALLDICT
+}>
+get_box_value PROC:<{
+  TRUE
+  get_box_internal CALLDICT
+  DUP
+  0 INDEX
+  64 PUSHINT AND
+  33 THROWIFNOT
+  6 INDEX
+}>

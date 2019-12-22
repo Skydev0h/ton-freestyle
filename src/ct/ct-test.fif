@@ -1,0 +1,585 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #1: Conditional transfer smart contract (CTSC)                 |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+	
+	THIS TEST SUITE REQUIRES SPECIAL PATCH THAT INTRODUCES runvmctxact AND 
+	    runvmctxactq FUNCTIONS THAT ALSO RETURN THE C5 REGISTER OUTPUT!!!
+*/
+
+true =: runvmctxact_is_available
+// false =: runvmctxact_is_available { } : gasrunvmctxact { } : gasrunvmctxactq
+
+// If used on TON version without this function change to false
+// THIS WILL DISABLE TEST CONDITIONS RELATED TO THE C5 REGISTER
+
+"TonUtil.fif" include
+"Asm.fif" include
+"Color.fif" include
+{ .s 255 halt } : ^ // inspect stack tool
+
+// Load code
+PROGRAM{ "ctsc.fif" include }END>c constant Code
+
+newkeypair
+	dup constant PublicKey 256 B>u@ constant UPublicKey
+	dup constant PrivateKey 256 B>u@ constant UPrivateKey
+	
+// Build initial data
+<b 
+	GR$100 Gram,  // min_grams
+	GR$250 Gram,  // max_grams
+	GR$20 Gram,   // min_accepted
+	1000 32 u, // collect_deadline
+	1500 32 u, // release_locktime
+	2000 32 u, // release_deadline
+	0 3 u, // initialized destroyed can_reclaim
+	0 1 u, // continuous_coll
+	0 1 u, // auto_release
+	1 1 u, // has_controller
+	null dict, // investors
+	<b
+		1 8 i, 0x11111111 256 u, 0 Gram, 30000 20 u,
+		2 8 i, 0x22222222 256 u, GR$20 Gram,
+		3 8 i, 0x33333333 256 u, 0 Gram, 5000 20 u,
+		<b
+			4 8 i, 0x44444444 256 u, GR$5 Gram,
+		b> ref,
+	b> dict, // beneficiaries
+	1 1 u, // ext_controller
+	UPublicKey 256 u, // controller_addr
+	-1 8 i, // beneficiary_wc
+	0xBEBE1C1A 256 u, // beneficiary_addr
+b> =: InitialData
+
+// Initialize data variable
+variable CurrentData
+variable NewData
+variable OutputActions
+variable MessageValue
+variable MessageCell
+variable MessageBody
+variable CurrentTime
+variable ContractBalance
+variable EntryPoint
+variable RetCode
+variable SenderWC
+variable SenderAddr
+variable DataChanged
+variable TestNum
+variable DetailedRun
+variable CurrentKey
+variable DataBackup
+variable GasUsed
+variable TotalGasUsed
+runvmctxact_is_available =: rvca
+1000000 =: GasLimit
+
+InitialData CurrentData !
+500 CurrentTime !
+GR$10 ContractBalance !
+0 EntryPoint !
+<b b> MessageBody !
+1 TestNum !
+false DetailedRun !
+PrivateKey CurrentKey !
+0 TotalGasUsed !
+
+{
+	0 tuple 0x076ef1ea , // magic
+	0 , 0 , // actions msg_sents
+	CurrentTime @ , // unix_time
+	1 , 1 , 0 , // block_lt, trans_lt, rand_seed
+	0 tuple ContractBalance @ , dictnew , , // remaining balance
+	0 , dictnew , // contract_address, global_config
+	1 tuple // wrap to another tuple
+} : c7
+
+variable RetCode
+
+{ ContractBalance @ + ContractBalance ! } : AddBalance
+{ ContractBalance @ swap - ContractBalance ! } : SubBalance
+{
+	^cyan ."-> Run VM method " ^yellow EntryPoint @ dup . ^cyan ."with message" 0 =
+	{ ^magenta ." carrying " ^green MessageValue @ .GR ^magenta ."from " ^yellow SenderWC @ SenderAddr @ .addr } if .":" ^reset cr
+	MessageBody @ dup null? not { <s csr. } { drop cr } cond
+	^green ."-> Current data (c4):" ^reset cr CurrentData @ <s csr.
+	EntryPoint @ 0 = { MessageValue @ MessageCell @ } if MessageBody @ dup null? not { <s } { drop } cond
+	EntryPoint @
+	Code <s CurrentData @ 
+	EntryPoint @ 0 = { MessageValue @ AddBalance } if c7 EntryPoint @ 0 = { MessageValue @ SubBalance } if
+	GasLimit rvca { ^red DetailedRun @ { gasrunvmctxact } { gasrunvmctxactq } cond ^reset }
+	{ ^red gasrunvmctx ^reset } cond dup GasUsed ! TotalGasUsed @ + TotalGasUsed !
+	rvca { OutputActions ! } if   NewData !   RetCode !     false DetailedRun !
+	CurrentData @ hash NewData @ hash <> dup DataChanged !
+	dup { ^green ."-> Resulting data (c4):" ^reset cr NewData @ <s csr. } if
+	rvca { OutputActions @ <s dup sbits swap srefs + 0 = { ^yellow ."-> Output actions (c5):" ^reset cr OutputActions @ <s csr. } ifnot } if
+	RetCode @ dup 0 = { ^green } { ^red } cond ."Result code: " ^yellow . ^reset cr
+	true = { ^yellow ."Data was changed!" } { ^blue ."Data was not changed" } cond ^reset cr
+	NewData @ CurrentData !
+}
+: RunVM
+
+{ true DetailedRun ! } : Detailed
+{ false DetailedRun ! } : Silent
+{ swap <b 0 4 u, b{100} s, 
+  swap dup SenderWC ! 8 i, 
+  swap dup SenderAddr ! 256 u, b> MessageCell ! } : SetAddress
+{ CurrentTime @ + CurrentTime ! } : AddTime
+{ CurrentTime ! } : SetTime
+{ 0 EntryPoint ! } : SetInternal
+{ -1 EntryPoint ! } : SetExternal
+{ MessageBody ! MessageValue ! SetAddress } : SetMessage
+{ SetMessage SetInternal } : SetIntMessage
+{ MessageBody ! SetExternal } : SetExtMessage
+{ MessageBody @ hashu CurrentKey @ ed25519_sign_uint
+  <b swap B, MessageBody @ <s s, b> MessageBody ! } : Signed
+{ MessageBody ! EntryPoint ! } : SetMethodId
+{ CurrentData @ DataBackup ! } : SaveData
+{ DataBackup @ CurrentData ! } : LoadData
+{ CurrentData @ <s } : GetData
+{ ^magenta ."[---> " ^cyan ."Test #" ^green TestNum @ . ^cyan .": " ^yellow type ^magenta ." <---]" 
+  ^reset cr TestNum @ 1+ TestNum ! } : BeginTest
+{ ^green ."[-> Test passed! <-]" ^reset cr cr } : EndTest
+{ RetCode @ 0 = { cr ^red ."Test failed: Expected success retcode" ^reset cr cr 1 quit } ifnot } : ExpectSuccess
+{ RetCode @ 0 = { cr ^red ."Test failed: Expected failure retcode" ^reset cr cr 1 quit } if } : ExpectFailure
+{ dup RetCode @ = { cr ^red ."Test failed: Expected retcode " . ^reset cr cr 1 quit } ifnot drop } : ExpectCode
+{ DataChanged @ false = { cr ^red ."Test failed: Expected data changed" ^reset cr cr 1 quit } if } : ExpectDataChange
+{ DataChanged @ true = { cr ^red ."Test failed: Expected data not changed" ^reset cr cr 1 quit } if } : ExpectDataSame
+0x0ec3c86d =: act_send_msg     0xad4de08e =: act_set_code     0x36e6b809 =: act_reserve     0x26fa1dd4 =: act_change_l
+rvca {
+{ OutputActions @ <s dup sbits swap srefs + 0 = { cr ^red ."Test failed: Expected no outputs" ^reset cr cr 1 quit } ifnot } : ExpectNoOutputs
+{ 0 OutputActions @ <s { dup sbits over srefs + } { dup srefs 0 > { ref@ <s } if swap 1+ swap } while drop 2dup =
+  { cr ^red ."Test failed: got " . ."output actions, expected " . ^reset cr cr 1 quit } ifnot 2drop } : ExpectOutputs
+  {
+	^cyan ."Current account balance: " ^yellow ContractBalance @ .GR ^cyan .", incoming message value: " ^yellow MessageValue @ 
+		^yellow .GR ^cyan .", total: " ^yellow ContractBalance @ MessageValue @ + .GR ^reset cr
+	null OutputActions @ <s
+		{ dup sbits over srefs + }
+		{ ref@+ <s } while drop
+		{ dup null? not } 
+		{ 32 u@+ swap
+			dup act_send_msg = { drop 8 u@+ ref@ <s swap ^green ."[~] Send message ( mode 0x" ^yellow 2 0x. ^green .") to "
+					             9 u@+ 8 i@+ 256 u@+ -rot ^yellow .addr ^green ."carrying " Gram@ ^yellow .GR
+								 64 and { ^green ."(bounce)" } { ^red ."(no bounce)" } cond ^reset cr 0 } if
+			dup act_set_code = { drop ."Set code message (not supported)" drop cr 0 0 } if
+			dup act_reserve  = { drop 8 u@+ Gram@+ 1 u@ -rot ^red ."Currency reserve message ( " ^yellow .GR ^red .") with flags " ^yellow . ^reset cr drop 0 } if
+			    act_change_l = { drop ."Change library message (not supported)" drop cr 0 } if
+		} while drop
+  } : OutputActionParse
+}
+{
+  { } : ExpectNoOutputs     { drop } : ExpectOutputs       { } : OutputActionParse
+} cond
+0 0 SetAddress
+
+/*
+out_list_empty$_ = OutList 0;
+out_list$_ {n:#} prev:^(OutList n) action:OutAction
+  = OutList (n + 1);
+act_send_msg#0ec3c86d mode:(## 8) 
+  out_msg:^(MessageRelaxed Any) = OutAction;
+act_set_code#ad4de08e new_code:^Cell = OutAction;
+act_reserve_currency#36e6b809 mode:(## 8)
+  currency:CurrencyCollection = OutAction;
+libref_hash$0 lib_hash:bits256 = LibRef;
+libref_ref$1 library:^Cell = LibRef;
+act_change_library#26fa1dd4 mode:(## 7) { mode <= 2 }
+  libref:LibRef = OutAction;
+*/
+
+cr
+
+"Initialization" 
+BeginTest
+	<b b> SetExtMessage 
+	Silent RunVM
+	ExpectSuccess ExpectDataChange ExpectNoOutputs
+EndTest
+
+"Initialization repeat" 
+BeginTest
+	<b b> SetExtMessage
+	Silent RunVM
+	9 ExpectCode ExpectDataSame ExpectNoOutputs 
+EndTest
+
+"Wrong signature" 
+BeginTest
+	<b 0 256 u, 0 256 u, 0 32 u, b> SetExtMessage
+	Silent RunVM
+	42 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Empty signed message" 
+BeginTest
+	<b b> SetExtMessage Signed
+	Silent RunVM
+	9 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Invalid release command"
+BeginTest
+	<b 0x52656c65 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	31 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Invalid reclaim command"
+BeginTest
+	<b 0x52636c6d 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	31 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Very low internal message"
+BeginTest
+	-1 0x123456789ABCDEF GR$3 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+	
+"Low internal message"
+BeginTest
+	-1 0x123456789ABCDEF GR$23 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Adequate internal message"
+BeginTest
+	-1 0x123456789ABCDEF GR$55 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$50 AddBalance
+
+"Internal message from same sender"
+BeginTest
+	-1 0x123456789ABCDEF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$70 AddBalance
+
+"Internal message from another sender"
+BeginTest
+	-1 0x1133557799BBDDFF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$70 AddBalance
+
+"Internal message with custom gas (low deposit)"
+BeginTest
+	-1 0x1133557799BBDDFF GR$75 <b 0x4761732b 32 u, GR$65 Gram, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Internal message with custom gas (adequate?)"
+BeginTest
+	-1 0x1133557799BBDDFF GR$100 <b 0x4761732b 32 u, GR$80 Gram, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$20 AddBalance
+
+"Message clipping test"
+BeginTest
+	-1 0x123456789ABCDEF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$30 AddBalance
+
+"Check filling"
+BeginTest
+	-1 0x123456789ABCDEF GR$5.01 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+SaveData
+1250 SetTime
+
+"Check collecting after deadline if forbidden"
+BeginTest
+	-1 0x1133557799BBDDFF GR$100 <b 0x4761732b 32 u, GR$80 Gram, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Check reclaim after collect before unlock"
+BeginTest
+	<b 0x52636c6d 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	32 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Check release after collect before unlock"
+BeginTest
+	<b 0x52656c65 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	32 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+1750 SetTime
+
+"Check reclaim after unlock"
+BeginTest
+	<b 0x52636c6d 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	ExpectSuccess ExpectDataChange ExpectNoOutputs
+EndTest
+
+"Invalid release command Mark II"
+BeginTest
+	<b 0x52656c65 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	34 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Check reclaimable getter"
+BeginTest
+	87846 null SetMethodId
+	Silent -1 0x123456789ABCDEF RunVM
+	. ExpectSuccess ExpectDataSame ExpectNoOutputs
+EndTest
+
+"Check user reclaim"
+BeginTest
+	-1 0x123456789ABCDEF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+2250 SetTime
+"Check user reclaim after release deadline"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Check user reclaim dublicate"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Invalid release command Mark III"
+BeginTest
+	<b 0x52656c65 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	33 ExpectCode ExpectDataSame ExpectNoOutputs
+EndTest
+
+1750 SetTime
+LoadData
+
+"Time machine: release funds"
+BeginTest
+	<b 0x52656c65 32 u, b> SetExtMessage Signed
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 5 ExpectOutputs OutputActionParse
+EndTest
+
+"Time machine: ruins of contract"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataSame 1 ExpectOutputs OutputActionParse
+EndTest
+
+
+2250 SetTime
+LoadData
+
+"Time machine: automatic reclaim activation"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+LoadData
+GR$99 ContractBalance !
+
+"Time machine: failed data collect (after deadline 2)"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+LoadData
+1750 SetTime
+
+"Time machine: failed data collect (after deadline 1)"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+LoadData
+
+"Time machine: failed data collect unsuspecting passerby (after deadline 1)"
+BeginTest
+	-1 0xA55AEE GR$10 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+<b 
+	GR$100 Gram,  // min_grams
+	GR$500 Gram,  // max_grams
+	GR$20 Gram,   // min_accepted
+	1000 32 u, // collect_deadline
+	1500 32 u, // release_locktime
+	2000 32 u, // release_deadline
+	0 3 u, // initialized destroyed can_reclaim
+	1 1 u, // continuous_coll
+	1 1 u, // auto_release
+	1 1 u, // has_controller
+	null dict, // investors
+	null dict, // beneficiaries
+	0 1 u, // ext_controller
+	-1 8 i, // controller_wc
+	0xC011E 256 u, // controller_addr
+	-1 8 i, // beneficiary_wc
+	0xBEBE1C1A 256 u, // beneficiary_addr
+b> DataBackup !
+LoadData
+
+1250 SetTime
+GR$101 ContractBalance !
+
+"Time machine: test continuous collection"
+BeginTest
+	-1 0x1133557799BBDDFF GR$55 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+
+1750 SetTime
+
+"Test release by wrong address"
+BeginTest
+	-1 0x1133557799BBDDFF GR$55 <b 0x52656c65 32 u, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+
+SaveData
+
+"Test reclaim by controller address"
+BeginTest
+	-1 0xC011E GR$5 <b 0x52636c6d 32 u, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Test reclaim by user"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+LoadData
+
+"Test release by controller address"
+BeginTest
+	-1 0xC011E GR$5 <b 0x52656c65 32 u, b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+
+2150 SetTime
+LoadData
+
+"Test automatic release by unsuspecting passerby"
+BeginTest
+	-1 0x1133557799BBDDFF GR$5 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+"Test getter method get_config"
+BeginTest
+	103798 <b b> SetMethodId
+	Silent RunVM
+	ExpectSuccess tuple? { cr ^red ."Test failed: Expected to recieve tuple" ^reset cr cr 1 quit } ifnot
+EndTest
+
+"Test getter method reclaiming"
+BeginTest
+	118924 <b b> SetMethodId
+	Silent RunVM
+	ExpectSuccess . 
+EndTest
+
+<b 
+	GR$100 Gram,  // min_grams
+	GR$500 Gram,  // max_grams
+	GR$20 Gram,   // min_accepted
+	0 32 u, // collect_deadline disabled
+	1500 32 u, // release_locktime
+	2000 32 u, // release_deadline
+	0 3 u, // initialized destroyed can_reclaim
+	1 1 u, // continuous_coll
+	1 1 u, // auto_release
+	0 1 u, // has_controller
+	null dict, // investors
+	null dict, // beneficiaries
+	// 0 1 u, // ext_controller
+	// -1 8 i, // controller_wc
+	// 0xC011E 256 u, // controller_addr
+	-1 8 i, // beneficiary_wc
+	0xBEBE1C1A 256 u, // beneficiary_addr
+b> DataBackup !
+LoadData
+
+1250 SetTime
+GR$50 ContractBalance !
+
+"Internal message from some sender"
+BeginTest
+	-1 0x123456789ABCDEF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$70 AddBalance
+
+1750 SetTime
+
+"Internal message from another sender after dl1"
+BeginTest
+	-1 0x1133557799BBDDFF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 2 ExpectOutputs OutputActionParse
+EndTest
+GR$70 AddBalance
+
+2250 SetTime
+SaveData
+
+"Test auto release"
+BeginTest
+	-1 0x123456789ABCDEF GR$75 <b b> SetIntMessage
+	Silent RunVM
+	ExpectSuccess ExpectDataChange 1 ExpectOutputs OutputActionParse
+EndTest
+
+^yellow ."Code byte size: " ^cyan Code 0 boc+>B Blen dup . ^reset cr
+^yellow ."Total used gas: " ^red TotalGasUsed @ dup . ^reset cr
+^yellow ."Gas / code: " ^green 1000000000 * swap / .GR ^reset cr
+cr
