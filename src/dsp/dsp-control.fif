@@ -1,0 +1,105 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #2: Data storage proxy smart contract (DSPSC)                  |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+"TonUtil.fif" include
+"GetOpt.fif" include
+"Asm.fif" include
+"Color.fif" include
+{ ^red .s ^reset 255 halt } : ^ // inspect stack tool
+
+{ show-options-help 1 halt } : usage
+{ hole dup -rot ! } : defvar
+
+// Default values
+null defvar =: msg_mode
+null defvar =: box_name
+null defvar =: keyfile_base
+
+// Options 
+begin-options ""
++cr +tab +"[-e bnew|bdel|frzz|thaw|prot|fres|bset|bcfg|chow|chfr|help]" +cr
+	+tab +"[-i bset|bcfg|unpr|prot|inqu|prox|help] [-n <box-name>]" +cr
+	+tab +"[-k <keyfile-base>] [-p <protected-frt>] " +cr 
+	+tab +"[-t <box-value-text>] [-v <box-value-boc>] " +cr
+	+tab +"[-o | -O <owner-address>] [-q | -Q <quota>]" +cr 
+	+tab +"[-g | -G] [-r | -R] [-l | -L] [-K <new-keyfile-base>]" +cr 
+	+tab +"[-a <contract-address>] -- <savefile>" +cr +cr
+	+tab +"Generates a control request to data storage proxy smart-contract" +cr
+	+tab +"Request will be saved to <savefile>-<ext|int>-<type>.boc." +cr
+	+tab +"Please refer to documentation (quick start) for detailed information about params" +cr
+	generic-help
+	
+	"e" "--ext" { drop } short-long-option-arg
+	  "Prepares for provided external message operation (help for list)" option-help
+	
+	"i" "--int" { drop } short-long-option-arg
+	  "Prepares for provided internal message operation (help for list)" option-help
+	  
+	"n" "--box-name" { drop } short-long-option-arg
+	  "[For all operations except chow and chfr] Specifies box name to work on" option-help
+	  
+	"k" "--keyfile-base" { drop } short-long-option-arg
+	  "[For all external operations] Specifies keyfile base (w/o .pk) for signing" option-help
+	  
+	"p" "--protected-frt" { drop } short-long-option-arg
+	  "[For chfr external operation] Sets the value of FRT to be set in contract" option-help
+	  
+	"t" "--box-value-text" { drop } short-long-option-arg
+	  "[For bset operation] Specifies new text value to assign to the box" option-help
+	  
+	"v" "--box-value-boc" { drop } short-long-option-arg
+	  "[For bset operation] Loads a BoC value to assign to the box" option-help
+	  
+	"o" "--no-owner" { drop } short-long-option
+	  "[For bnew and bcfg operations] Indicates that box owner should be reset" option-help
+	  
+	"O" "--set-owner" { drop } short-long-option-arg
+	  "[For bnew and bcfg operations] Specifies that box should have following owner" option-help
+	  
+	"q" "--no-quota" { drop } short-long-option-arg
+	  "[For bnew and bcfg operations] Disables user quota on the box" option-help
+	  
+	"Q" "--set-quota" { drop } short-long-option-arg
+	  "[For bnew and bcfg operations] Sets user quota in format cells:bits (0 means disabled)" option-help
+	  
+	"g" "--deny-get" { drop } short-long-option
+	  "[For bnew and bcfg operations] Disallows fetching box value with getter" option-help
+	  
+	"G" "--allow-get" { drop } short-long-option
+	  "[For bnew and bcfg operations] Permits fetching box value with getter" option-help
+	  
+	"r" "--deny-inquiry" { drop } short-long-option
+	  "[For bnew and bcfg operations] Disallows fetching box value with inquiring" option-help
+	  
+	"R" "--allow-inquiry" { drop } short-long-option
+	  "[For bnew and bcfg operations] Permits fetching box value with inquiring" option-help
+	
+	"l" "--deny-inline" { drop } short-long-option
+	  "[For bnew and bcfg operations] Disallows using box value as injection in proxy message" option-help
+	  
+	"L" "--allow-inline" { drop } short-long-option
+	  "[For bnew and bcfg operations] Permits using box value as injection in proxy message" option-help	
+	  
+	"k" "--keyfile-base" { drop } short-long-option-arg
+	  "[For chow operation] Specifies keyfile base (w/o .pk) for of new owner of the contract" option-help
+	  
+	"a" "--contract-address" { drop } short-long-option-arg
+	  "[For all external operations] Specifies destination contract address or @filename.addr" option-help
+	
+parse-options
+
+// $# 1 <> ' usage if
+// $1 =: file-base
+
+// msg_mode @ null? ' usage if
+
+usage
+

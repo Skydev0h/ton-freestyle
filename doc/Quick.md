@@ -195,7 +195,9 @@ After creating the query, some amount of Grams (like 5-10 to be safe) should be 
 
 ### Generating control messages
 
-WIP
+Control messages (both external that must be sent directly and internal that shall be embedded into wallet query) are generated with help of `dsp-control.fif` script. It contains a wide range of options that allow to build any desired control message for the smart contract:
+
+*WIP*
 
 ### Testing
 
