@@ -1,0 +1,110 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #2: Data storage proxy smart contract (DSPSC)                  |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+"TonUtil.fif" include
+"GetOpt.fif" include
+"Asm.fif" include
+"Color.fif" include
+{ ^red .s ^reset 255 halt } : ^ // inspect stack tool
+
+{ show-options-help 1 halt } : usage
+{ hole dup -rot ! } : defvar
+
+// Default values
+0 defvar =: protected_frt
+
+// Options 
+begin-options
+	      "[-p <protected-frt>] -- <workchain-id> <filename-base>" +cr
+	+tab +"" +cr +cr
+	+tab +"Generates a data storage proxy smart-contract with provided configuration" +cr
+	+tab +"Creation request will be saved to <savefile>-create.boc (must be specified)." +cr
+	+tab +"Private key file will be saved to (loaded from) <savefile>.pk file." +cr
+	+tab +"Please refer to documentation (quick start) for detailed information about params" +cr
+	generic-help
+	
+	"p" "--protected-frt" { parse-int protected_frt ! } short-long-option-arg
+	  "Sets initial force reset timeout for protected cells for the contract" option-help
+parse-options
+
+$# 2 <> ' usage if
+$1 parse-workchain-id =: wc
+$2 =: file-base
+
+"dspsc.fif" file-exists? { ^red ."Error: contract code logic file dspsc.fif "
+	."is missing!" cr "dspsc.fc" file-exists? { ^magenta
+	."Because source code exists you should execute" cr 
+	^yellow ."    func ../stdlib.fc dspsc.fc -o dspsc.fif" ^magenta cr
+	."and then try calling this script again!" cr
+	} if ^reset 66 halt } ifnot
+
+// Load code
+PROGRAM{ "dspsc.fif" include }END>c =: Code
+
+file-base +".pk" load-generate-keypair =: Private =: Public
+
+<b 
+	0 8 u,
+	0 32 u,
+	Public B,
+	protected_frt @ 24 u,
+b> =: Data
+
+null =: Lib
+
+<b
+   b{0011} s, // 0 split_depth:nothing$0, 0 special:nothing$0
+   Code ref,  // 1 code:just$1 ^Cell,
+   Data ref,  // 1 data:just$1 ^Cell
+   Lib dict,  // 0 library:nothing$0 (Maybe ^Cell)
+b> =: StateInit
+
+wc StateInit hash 2constant ContractAddr
+
+<b 0 32 u, // seqno
+   0 32 u, // init
+b> =: Body
+
+Body hashu Private ed25519_sign_uint =: BodySign
+
+<b 
+//  ext_in_msg_info$10
+//  ||src:MsgAddressExt addr_none$00
+//  ||||dest:MsgAddressInt addr_std$10
+//  ||||||anycast:(Maybe Anycast) nothing$0 {X:Type} = Maybe X;
+//  |||||||
+//  \/\/\/V
+  b{1000100} s,
+  ContractAddr addr, // workchain_id:int8 address:uint256 = MsgAddressInt;
+//   import_fee:Grams = CommonMsgInfo; 0000: zero length = zero
+//   || init:(Maybe (Either StateInit ^StateInit))
+//   || just$1 {X:Type} value:X = Maybe X;
+//   || |left$0 {X:Type} {Y:Type} value:X = Either X Y; (Selected StateInit)
+//   || ||
+//  \\//VV
+  b{000010} s,
+  StateInit <s s,
+  b{0} s, // body:(Either X ^X) = Message X; (Selected left$0: X)
+  BodySign B, Body <s s,
+b> constant InitMessage
+
+InitMessage 2 boc+>B file-base +"-create.boc" B>file
+ContractAddr file-base +".addr" save-address
+
+cr ^green ."Creation query was saved to file: " ^yellow file-base type ."-create.boc" ^green ."!" cr ^reset
+^green ."Contract address saved to file: " ^yellow file-base type .".addr" ^green ."!" cr ^reset
+."First, send some (like 5-10) Grams to init address: " ^yellow ContractAddr 5 .Addr ^reset cr
+."Afterwards, you need to use lite-client to deploy contract to the network" cr
+."  For example, execute " ^green ."sendfile " file-base type ."-create.boc" ^reset ." in " ^blue ."lite-client" ^reset ." console!" cr 
+."To send Gram and commands to SC use normal address: " ^cyan ContractAddr 4 .Addr ^reset cr
+."You can use stock show-addr.fif script to redisplay address later." cr
+cr
+

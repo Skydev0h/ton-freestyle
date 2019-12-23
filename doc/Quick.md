@@ -51,6 +51,8 @@ Following table describes the parameters in detail:
 | -B    | --ben-addr           | Installs a new beneficiary into a beneficiary list. Followed by beneficiary address, percent or value should be preset with either -P / --ben-pct or -V / --ben-val parameter. |
 |       | --ok                 | Suppresses warnings and forces creation. Not recommended.    |
 
+Obligatory parameter `workchain-id` (that must go after -- because of -1 handling quirks) identifies in which workchain to deploy contract (currently, -1 for masterchain or 0 for basechain). Another required parameter `filename-base` indicates base filename for resulting contract create query and address files.
+
 It should be noted that *unixtime parameters* are absolute unless -r *flag* is used, then they are calculated from current time (except for 0 which remains 0 - that is, disabled).
 
 -B parameter may appear as many times as needed, -P or -V parameter should appear before it to define how much and what would be sent to that beneficiary.
@@ -183,7 +185,13 @@ In order to facilitate usage of the smart contract, there are some scripts to be
 
 ### Contract creation
 
-WIP
+To create the contract you need to use `dsp-create.fif` script. Invoking it without any parameters displays the usage help enlisting all possible parameters and describing their values. 
+
+The only possible optional parameter is `-p / --protected-frt` that allows to set initial protected reset timeout setting for the contract (without it PR is disabled, PRT is set to 0).
+
+Obligatory parameter `workchain-id` (that must go after -- because of -1 handling quirks) identifies in which workchain to deploy contract (currently, -1 for masterchain or 0 for basechain). Another required parameter `filename-base` indicates base filename for resulting contract create query and address files.
+
+After creating the query, some amount of Grams (like 5-10 to be safe) should be sent to the initialization address, after which contract creation query should be sent. All next transfers and commands to the contract shall be sent to the normal, bounceable address.
 
 ### Generating control messages
 
