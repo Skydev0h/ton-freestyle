@@ -175,20 +175,22 @@ In order to facilitate usage of the smart contract, there are some scripts to be
 
 `dspsc.fc` and `dspsc.fif` are the code of SC itself, they should not be touched.
 
-WIP
+`dsp-create.fif` can be used to prepare a query to create a new SC instance.
+
+`dsp-control.fif` can be used to generate control internal or external messages.
+
+`dsp-test.fif` is a complete test suite (66 tests!) for the contract (requires core patch).
 
 ### Contract creation
 
 WIP
 
-### Generating external messages
-
-WIP
-
-### Generating internal messages
+### Generating control messages
 
 WIP
 
 ### Testing
 
-WIP
+For this contract the test suite was even improved comparing to CTsc one, it now displays actual message body sent in c5, more adequate gas / code / #tests metric, and does thoughtful testing of external messages, internal messages and getter methods. The script name is `dsp-test.fif`.
+
+The implications about patching the core are same as for CTsc test suite.

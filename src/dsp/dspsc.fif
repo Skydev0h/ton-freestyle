@@ -278,17 +278,39 @@ Message:Send PROC:<{
   STGRAMS
   s1 s5 XCHG
   107 STU
-  s0 s4 XCHG2
-  STSLICER
-  STREF
+  s4 PUSH
+  ISNULL
+  0 EQINT
+  IF:<{
+    s0 s4 XCHG2
+    STSLICER
+    s3 PUSH
+    8 PUSHPOW2
+    AND
+    IF:<{
+      SWAP
+      CTOS
+      STSLICER
+      s0 s2 XCHG
+      8 PUSHPOW2
+      SUB
+    }>ELSE<{
+      STREF
+      s0 s2 XCHG
+    }>
+  }>ELSE<{
+    s2 s4 XCHG2
+    2DROP
+  }>
   OVER
   ISNULL
   0 EQINT
   IF:<{
-    SWAP
+    -ROT
     STSLICER
   }>ELSE<{
-    NIP
+    -ROT
+    DROP
   }>
   ENDC
   2 PUSHINT
@@ -384,63 +406,68 @@ recv_internal PROC:<{
   s5 PUSH
   1886547832 PUSHINT
   EQUAL
-  IF:<{
-    DUP
+  IFJMP:<{
+    s2 POP
+    s2 POP
+    s3 POP
+    s3 POP
+    s3 POP
+    s3 POP
+    s0 s2 XCHG
     32 PUSHINT AND
     33 THROWIFNOT
-    s0 s4 XCHG
     8 LDI
     256 LDU
     1 LDU
-    NIP
     LDREF
     SWAP
     CTOS
     SWAP
     LDREF
-    SWAP
+    DROP
     CTOS
     0 PUSHINT
     64 PUSHINT
-    s7 PUSH
+    s0 s4 XCHG
+    8 LSHIFT#
+    s1 s4 XCHG
+    OR
+    s0 s6 XCHG
     6 INDEX
-    s6 s7 XCHG
-    s5 s7 XCHG
-    s4 s3 s0 XCHG3
-    s2 s7 XCHG
+    s5 s6 XCHG
+    s4 s5 XCHG
+    s3 s4 XCHG
     SWAP
     Message:Send CALLDICT
-  }>ELSE<{
-    s0 s4 XCHG
   }>
-  s4 PUSH
+  DUP
   2 PUSHINT AND
   39 THROWIF
-  s4 PUSH
+  DUP
   1 PUSHINT AND
   32 THROWIFNOT
   OVER
   1 INDEX
-  s0 s8 XCHG2
+  s8 PUSH
   NEQ
   32 THROWIF
-  DUP
+  OVER
   2 INDEX
-  s0 s6 XCHG2
+  s7 PUSH
   NEQ
   32 THROWIF
-  s3 PUSH
+  s5 PUSH
   1651729780 PUSHINT
   EQUAL
   IFJMP:<{
-    s3 POP
-    s0 s4 XCHG
+    s5 POP
+    s0 s3 XCHG
     LDREF
     DROP
-    SWAP
+    s0 s4 XCHG
     4 PUSHINT AND
     IF:<{
-      DUP
+      s3 PUSH
       CTOS
       Slice:Lengths CALLDICT
       s4 PUSH
@@ -460,53 +487,87 @@ recv_internal PROC:<{
       AND
       49 THROWIF
     }>
-    s1 s2 XCHG
+    s2 s3 XCHG2
     6 SETINDEX
-    s3 s3 XCHG2
+    s1 s5 s3 XCHG3
+    s0 s5 XCHG
     Box:Store INLINECALLDICT
+    0 PUSHINT
+    64 PUSHINT
+    PUSHNULL
+    PUSHNULL
+    PUSHNULL
+    s5 s6 XCHG
+    Message:Send CALLDICT
   }>
-  s3 PUSH
+  s5 PUSH
   1650681447 PUSHINT
   EQUAL
   IFJMP:<{
-    s2 POP
-    s2 POP
-    s2 s3 XCHG2
-    TRUE
+    DROP
+    s4 POP
+    2SWAP
+    FALSE
     Box:Configure CALLDICT
-    s1 s3 s3 XCHG3
+    s5 s3 XCHG2
+    s0 s5 XCHG
     Box:Store INLINECALLDICT
+    0 PUSHINT
+    64 PUSHINT
+    PUSHNULL
+    PUSHNULL
+    PUSHNULL
+    s5 s6 XCHG
+    Message:Send CALLDICT
   }>
-  2DROP
-  s3 POP
-  DUP
+  s4 POP
+  s4 PUSH
   1886547828 PUSHINT
   EQUAL
   IFJMP:<{
-    DROP
-    OVER
+    s4 POP
+    s2 PUSH
     128 PUSHINT AND
     46 THROWIFNOT
     127 PUSHINT
-    s1 s2 XCHG
+    s1 s3 XCHG
     AND
+    s1 s3 XCHG
     0 SETINDEX
-    DROP
-    Storage:Save INLINECALLDICT
+    s5 s3 XCHG2
+    s0 s5 XCHG
+    Box:Store INLINECALLDICT
+    0 PUSHINT
+    64 PUSHINT
+    PUSHNULL
+    PUSHNULL
+    PUSHNULL
+    s5 s6 XCHG
+    Message:Send CALLDICT
   }>
   1970172018 PUSHINT
+  s1 s5 XCHG
   EQUAL
   IFJMP:<{
     127 PUSHINT
-    s1 s2 XCHG
+    s1 s3 XCHG
     AND
     247 PUSHINT
     AND
+    s1 s3 XCHG
     0 SETINDEX
-    DROP
-    Storage:Save INLINECALLDICT
+    s5 s3 XCHG2
+    s0 s5 XCHG
+    Box:Store INLINECALLDICT
+    0 PUSHINT
+    64 PUSHINT
+    PUSHNULL
+    PUSHNULL
+    PUSHNULL
+    s5 s6 XCHG
+    Message:Send CALLDICT
   }>
-  3 BLKDROP
+  7 BLKDROP
 }>
 recv_external PROC:<{
   NOW
@@ -681,10 +742,9 @@ recv_external PROC:<{
     s2 PUSH
     128 PUSHINT AND
     IFJMP:<{
-      2DROP
-      s3 PUSH
+      s5 PUSH
       5 INDEX
-      s1 s3 XCHG
+      s1 s5 XCHG
       GEQ
       47 THROWIFNOT
       127 PUSHINT
@@ -692,10 +752,10 @@ recv_external PROC:<{
       AND
       247 PUSHINT
       AND
-      s1 s2 XCHG
+      s1 s4 XCHG
       0 SETINDEX
-      DROP
-      Storage:Save INLINECALLDICT
+      s3 s1 s3 XCHG3
+      Box:Store INLINECALLDICT
     }>
     s3 PUSH
     4 INDEX

@@ -301,9 +301,16 @@ tuple Box:Configure(tuple box, slice query, int admin) {
 		.store_int(wc, 8)
 		.store_uint(addr, 256)
 		.store_grams(grams)
-		.store_uint (0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-		.store_slice(prefix)
-		.store_ref(data);
+		.store_uint (0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+	if (prefix.null?() == 0) {
+		msg~store_slice(prefix);
+		if (mode & 256) {
+			msg~store_slice(data.begin_parse());
+			mode -= 256;
+		} else {
+			msg~store_ref(data);
+		}
+	}
 	if (suffix.null?() == 0) {
 		msg~store_slice(suffix);
 	}
@@ -361,7 +368,8 @@ int Op:Proxy()     asm "1886547832 PUSHINT";
 		int box_mode  = in_msg~load_uint(1);
 		slice prefix  = in_msg~load_ref().begin_parse();
 		slice suffix  = in_msg~load_ref().begin_parse();
-		Message:Send(targ_wcid, targ_addr, 0, MF:MsgBalance(), prefix, box.[data](), suffix);
+		Message:Send(targ_wcid, targ_addr, 0, MF:MsgBalance() | (box_mode << 8), prefix, box.[data](), suffix);
+		return ();
 	}
 	throw_if(39, bflags.Frozen?());
 	throw_unless(32, bflags.HasOwner?());
@@ -378,24 +386,29 @@ int Op:Proxy()     asm "1886547832 PUSHINT";
 		}
 		box~[data=](new_val);
 		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance(), null(), null(), null());
 		return ();
 	}
 	if (op == Op:BoxConfig()) {
-		box = Box:Configure(box, in_msg, true);
+		box = Box:Configure(box, in_msg, false);
 		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance(), null(), null(), null());
 		return ();
 	}
 	if (op == Op:Protect()) {
 		throw_unless(46, bflags.FRPending?());
 		box~[flags=](bflags & Flag:!FRPending());
-		Storage:Save(data);
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance(), null(), null(), null());
 		return ();
 	}
 	if (op == Op:Unprotect()) {
 		box~[flags=](bflags & Flag:!FRPending() & Flag:!Protected());
-		Storage:Save(data);
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance(), null(), null(), null());
 		return ();
 	}
+	
 }
 
 () recv_external(slice in_msg) impure {
@@ -470,7 +483,7 @@ int Op:Proxy()     asm "1886547832 PUSHINT";
 		if (bflags.FRPending?()) {
 			throw_unless(47, now >= box.[fr_timeout]());
 			box~[flags=](bflags & Flag:!FRPending() & Flag:!Protected());
-			Storage:Save(data);
+			Box:Store(box, root, data, name);
 			return ();
 		}
 		throw_unless(46, data.[protected_frt]() > 0);
