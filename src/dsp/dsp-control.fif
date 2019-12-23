@@ -16,17 +16,51 @@
 { ^red .s ^reset 255 halt } : ^ // inspect stack tool
 
 { show-options-help 1 halt } : usage
-{ hole dup -rot ! } : defvar
+// { hole dup -rot ! } : defvar
+// { dup @ -rot or ! } : setflag
+
+{ find { 1 abort"word not found" } ifnot execute } : resolve
+{ bl word } : next-word
+
+{ next-word 1 { resolve dup @ rot or swap ! } } :: f+> // add to flags
+{ next-word 1 { resolve dup @ rot not and swap ! } } :: f-> // remove from flags
+{ next-word 1 { resolve ! } } :: => // assign to right
+{ next-word 1 { resolve -rot pair swap ! } } :: 2=> // assign to right
+{ next-word 1 { hole dup 1 'nop does rot 0 (create) ! } } :: =:> // create variable with default value
+
+{ execute drop } : switch
+{ 2 pick rot  = swap if } : case
+{ 2 pick rot and swap if } : &case
+{ 2 pick rot $= swap if } : $case
+
+{ next-word 1 { dup resolve @ 1 'nop does swap 0 (create) } } :: stone // freezes variable value as constant
+
+{ null } : [[
+{ { dup null? not } { dup resolve @ null? { +" must be set" abort } if drop } while drop } : ]]-vreq
+{ { dup null? not } { dup resolve null? { +" must be set" abort } if drop } while drop } : ]]-req
+{ { dup null? not } { dup resolve @ 1 'nop does swap 0 (create) } while drop } : ]]-stone
+{ { over null? not } { dup hole dup 1 'nop does 4 pick 0 (create) ! nip } while 2drop } : ]]-vars
+
+{ } : input // convenience
+{ } : ;     // more convenience
+{ parse-int } : input(int)
+{ false parse-load-address drop } : input(addr)
+
+1 =: external
+0 =: internal
 
 // Default values
-null defvar =: msg_mode
-null defvar =: box_name
-null defvar =: keyfile_base
+[[ "msg-mode" "box-name" "keyfile-base" "protected-frt" "box-value" "val-owner" "val-quota"
+   "new-keyfile-base" "contract-address" "box-value-text" "box-value-boc" "new-key" null ]]-vars
+   
+[[ "operation" "" ]]-vars
+
+[[ "set-flags" "rst-flags" "op-id" "quota-cells" "quota-bits" 0 ]]-vars
 
 // Options 
 begin-options ""
 +cr +tab +"[-e bnew|bdel|frzz|thaw|prot|fres|bset|bcfg|chow|chfr|help]" +cr
-	+tab +"[-i bset|bcfg|unpr|prot|inqu|prox|help] [-n <box-name>]" +cr
+	+tab +"[-i bset|bcfg|unpr|prot|help] [-n <box-name>]" +cr
 	+tab +"[-k <keyfile-base>] [-p <protected-frt>] " +cr 
 	+tab +"[-t <box-value-text>] [-v <box-value-boc>] " +cr
 	+tab +"[-o | -O <owner-address>] [-q | -Q <quota>]" +cr 
@@ -37,69 +71,221 @@ begin-options ""
 	+tab +"Please refer to documentation (quick start) for detailed information about params" +cr
 	generic-help
 	
-	"e" "--ext" { drop } short-long-option-arg
+	"e" "--ext" { external => msg-mode ; input => operation } short-long-option-arg
 	  "Prepares for provided external message operation (help for list)" option-help
 	
-	"i" "--int" { drop } short-long-option-arg
+	"i" "--int" { internal => msg-mode ; input => operation } short-long-option-arg
 	  "Prepares for provided internal message operation (help for list)" option-help
 	  
-	"n" "--box-name" { drop } short-long-option-arg
+	"n" "--box-name" { input => box-name } short-long-option-arg
 	  "[For all operations except chow and chfr] Specifies box name to work on" option-help
 	  
-	"k" "--keyfile-base" { drop } short-long-option-arg
+	"k" "--keyfile-base" { input => keyfile-base } short-long-option-arg
 	  "[For all external operations] Specifies keyfile base (w/o .pk) for signing" option-help
 	  
-	"p" "--protected-frt" { drop } short-long-option-arg
+	"p" "--protected-frt" { input(int) => protected-frt } short-long-option-arg
 	  "[For chfr external operation] Sets the value of FRT to be set in contract" option-help
 	  
-	"t" "--box-value-text" { drop } short-long-option-arg
+	"t" "--box-value-text" { input => box-value-text } short-long-option-arg
 	  "[For bset operation] Specifies new text value to assign to the box" option-help
 	  
-	"v" "--box-value-boc" { drop } short-long-option-arg
+	"v" "--box-value-boc" { input => box-value-boc } short-long-option-arg
 	  "[For bset operation] Loads a BoC value to assign to the box" option-help
 	  
-	"o" "--no-owner" { drop } short-long-option
+	"o" "--no-owner" { 0x01 f+> rst-flags } short-long-option
 	  "[For bnew and bcfg operations] Indicates that box owner should be reset" option-help
 	  
-	"O" "--set-owner" { drop } short-long-option-arg
-	  "[For bnew and bcfg operations] Specifies that box should have following owner" option-help
+	"O" "--set-owner" { 0x01 f+> set-flags ; input(addr) 2=> val-owner } short-long-option-arg
+	  "[For bnew and bcfg operations] Specifies that box should have following owner address" option-help
 	  
-	"q" "--no-quota" { drop } short-long-option-arg
+	"q" "--no-quota" { 0x04 f+> rst-flags } short-long-option-arg
 	  "[For bnew and bcfg operations] Disables user quota on the box" option-help
 	  
-	"Q" "--set-quota" { drop } short-long-option-arg
+	"Q" "--set-quota" { 0x04 f+> set-flags ; input => val-quota } short-long-option-arg
 	  "[For bnew and bcfg operations] Sets user quota in format cells:bits (0 means disabled)" option-help
 	  
-	"g" "--deny-get" { drop } short-long-option
+	"g" "--deny-get" { 0x40 f+> rst-flags } short-long-option
 	  "[For bnew and bcfg operations] Disallows fetching box value with getter" option-help
 	  
-	"G" "--allow-get" { drop } short-long-option
+	"G" "--allow-get" { 0x40 f+> set-flags } short-long-option
 	  "[For bnew and bcfg operations] Permits fetching box value with getter" option-help
 	  
-	"r" "--deny-inquiry" { drop } short-long-option
+	"r" "--deny-inquiry" { 0x10 f+> rst-flags } short-long-option
 	  "[For bnew and bcfg operations] Disallows fetching box value with inquiring" option-help
 	  
-	"R" "--allow-inquiry" { drop } short-long-option
+	"R" "--allow-inquiry" { 0x10 f+> set-flags } short-long-option
 	  "[For bnew and bcfg operations] Permits fetching box value with inquiring" option-help
 	
-	"l" "--deny-inline" { drop } short-long-option
+	"l" "--deny-inline" { 0x20 f+> rst-flags } short-long-option
 	  "[For bnew and bcfg operations] Disallows using box value as injection in proxy message" option-help
 	  
-	"L" "--allow-inline" { drop } short-long-option
+	"L" "--allow-inline" { 0x20 f+> set-flags } short-long-option
 	  "[For bnew and bcfg operations] Permits using box value as injection in proxy message" option-help	
 	  
-	"k" "--keyfile-base" { drop } short-long-option-arg
+	"K" "--new-keyfile-base" { input => new-keyfile-base } short-long-option-arg
 	  "[For chow operation] Specifies keyfile base (w/o .pk) for of new owner of the contract" option-help
 	  
-	"a" "--contract-address" { drop } short-long-option-arg
+	"a" "--contract-address" { input(addr) 2=> contract-address } short-long-option-arg
 	  "[For all external operations] Specifies destination contract address or @filename.addr" option-help
 	
 parse-options
 
-// $# 1 <> ' usage if
-// $1 =: file-base
+[[ "msg-mode" "box-name" "keyfile-base" "protected-frt" "val-owner" "val-quota"
+   "new-keyfile-base" "contract-address" "box-value-text" "box-value-boc" "operation"
+   "set-flags" "rst-flags" ]]-stone
 
-// msg_mode @ null? ' usage if
+msg-mode null? ' usage if
 
-usage
+operation "help" $= {
+	cr
+	msg-mode
+	external {
+		^cyan ."Supported external operations" ^green ." (-e / --ext)" ^reset cr cr
+		^yellow ."    bnew" ^reset .": Create a box with set name and configuration " cr
+		^yellow ."    bdel" ^reset .": Delete specified unprotected box             " cr
+		^yellow ."    frzz" ^reset .": Freezes specified unprotected box            " cr
+		^yellow ."    thaw" ^reset .": Unfreezes specified box                      " cr
+		^yellow ."    prot" ^reset .": Protects specified box                       " cr
+		^yellow ."    fres" ^reset .": Initiates or completes force reset procedure " cr
+		^yellow ."    bset" ^reset .": Changes data of specified unprotected box    " cr
+		^yellow ."    bcfg" ^reset .": Changes configuration of specified box       " cr
+		^yellow ."    chow" ^reset .": Changes contract owner public key            " cr
+		^yellow ."    chfr" ^reset .": Initiates or completes FRT change procedure  " cr
+	} case
+	internal {
+		^cyan ."Supported internal operations" ^green ." (-i / --int)" ^reset cr cr
+		^yellow ."    bset" ^reset .": Changes data of specified owned box          " cr
+		^yellow ."    bcfg" ^reset .": Changes configuration of specified owned box " cr
+		^yellow ."    unpr" ^reset .": Unprotects owned protected box               " cr
+		^yellow ."    prot" ^reset .": Object pending force reset                   " cr
+		// Those are actually not control messages but inquiry messages, moved out:
+		// ^yellow ."    inqu" ^reset .": Request specified box data as response       " cr
+		// ^yellow ."    prox" ^reset .": Inject specified box data and forward message" cr
+	} case
+	cr
+	1 halt
+} if
 
+$# 1 <> ' usage if
+$1 =: file-base
+
+set-flags rst-flags and { "Bad flags combination, cant set and unset same flag" abort } if
+set-flags rst-flags or =: any-flags
+
+box-value-text null? not box-value-boc null? not and abort"Please specify box value text OR box value BoC, not both!"
+
+box-value-text null? { <b box-value-text $, b> => box-value } ifnot
+box-value-boc null? { box-value-boc file>B B>boc => box-value } ifnot
+
+val-quota null? {
+	val-quota dup ":" $Pos dup -1 = abort"Invalid quota format (cells:bits)" 
+	$Split 1 $Split nip parse-int => quota-bits parse-int => quota-cells
+} ifnot
+
+new-keyfile-base null? {
+	new-keyfile-base +".pk" load-generate-keypair drop => new-key
+} ifnot
+
+[[ "box-value" "quota-cells" "quota-bits" "new-key" ]]-stone
+
+{ { 
+  0 { ."None" } case
+  0xFF { ."[  " } &case
+  0x01 { ."Has owner  " } &case
+  0x04 { ."Limited quota  " } &case
+  0x40 { ."Allow getting  " } &case
+  0x10 { ."Allow inquiring  " } &case
+  0x20 { ."Allow inlining  " } &case
+  0xFF { ."]" } &case
+} switch  } : listflags
+
+{ dup => op-id 32 u, } : =>op
+<b =:> Body
+{ 2 pick rot $= swap Body @ -rot if => Body } : <$case>
+{ <b box-name $, b> ref, ^cyan ."Selected box name: " ^yellow box-name type ^reset cr } : boxname,
+{ any-flags 0 = and abort"No configuration changes are set, empty change request is useless"
+  set-flags 8 u, rst-flags 8 u,
+  ^green ."Flags to  set : " ^yellow set-flags listflags ^reset cr
+  ^red   ."Flags to unset: " ^yellow rst-flags listflags ^reset cr
+  set-flags 0x01 and { [[ "val-owner" ]]-req val-owner unpair -rot 8 i, swap 256 u, 
+  ^cyan ."New box owner : " ^yellow val-owner unpair .addr ^reset cr
+  } if
+  set-flags 0x04 and { [[ "val-quota" ]]-req quota-cells Gram, quota-bits Gram, 
+  ^cyan ."New quota lims: " ^yellow quota-cells . ^reset ."Cells, " ^yellow quota-bits . ^reset ."Bits" cr
+  } if
+} : conf,
+
+msg-mode {
+	external {
+		[[ "contract-address" "keyfile-base" ]]-req
+		^cyan ."Selected operation (external message): " ^reset
+		operation {
+			"chow" { ^magenta ."chow" ^reset .": Changes contract owner public key" cr
+				0x63686f77 =>op [[ "new-keyfile-base" ]]-req new-key B,
+				^magenta ."New owner's public key: " ^yellow new-key Bx. ^reset cr } <$case>
+			"chfr" { ^yellow ."chfr" ^reset .": Initiates or completes FRT change procedure" cr
+				0x63686672 =>op [[ "protected-frt" ]]-req protected-frt 24 u,
+				^cyan ."New FRT timer value: " ^yellow protected-frt . ^reset ."seconds" cr } <$case>
+			op-id @ 0 = { [[ "box-name" ]]-req } if
+			"bnew" { ^yellow ."bnew" ^reset .": Create a box with set name and configuration" cr
+				0x626e6577 =>op boxname, false conf, } <$case>
+			"bdel" { ^magenta ."bdel" ^reset .": Delete specified unprotected box" cr
+				0x6264656c =>op boxname, } <$case>
+			"frzz" { ^yellow ."frzz" ^reset .": Freezes specified unprotected box" cr
+				0x66727a7a =>op boxname, } <$case>
+			"thaw" { ^yellow ."thaw" ^reset .": Unfreezes specified box" cr
+				0x74686177 =>op boxname, } <$case>
+			"prot" { ^magenta ."prot" ^reset .": Protects specified box" cr
+				0x70726f74 =>op boxname, } <$case>
+			"fres" { ^yellow ."fres" ^reset .": Initiates or completes force reset procedure" cr
+				0x66726573 =>op boxname, } <$case>
+			"bset" { ^yellow ."bset" ^reset .": Changes data of specified unprotected box" cr
+				0x62736574 =>op boxname, [[ "box-value" ]]-req box-value ref, } <$case>
+			"bcfg" { ^yellow ."bcfg" ^reset .": Changes configuration of specified box" cr
+				0x62636667 =>op boxname, true conf, } <$case>
+		} switch
+	} case
+	internal {
+		^cyan ."Selected operation (internal message): " ^reset
+		operation {
+			[[ "box-name" ]]-req
+			"bset" { ^yellow ."bset" ^reset .": Changes data of specified owned box" cr
+				0x62736574 =>op boxname, [[ "box-value" ]]-req box-value ref, } <$case>
+			"bcfg" { ^yellow ."bcfg" ^reset .": Changes configuration of specified owned box" cr
+				0x62636667 =>op boxname, true conf, } <$case>
+			"unpr" { ^magenta ."unpr" ^reset .": Unprotects owned protected box" cr
+				0x756e7072 =>op boxname, } <$case>
+			"prot" { ^yellow ."prot" ^reset .": Object pending force reset" cr
+				0x70726f74 =>op boxname, } <$case>
+			// "inqu" { 0x696e7175 =>op boxname, } <$case>
+			// "prox" { 0x70726f78 =>op boxname, } <$case>
+		} switch
+	} case
+} switch
+
+op-id @ 0 = abort"Unknown operation, try -e help or -i help for list"
+// stone op-id
+
+Body @ b> =: Message
+[[ "private" "public" "filename" "" ]]-vars
+variable MessageSign
+variable ExtMessage
+
+msg-mode { external {
+// External message
+keyfile-base +".pk" load-keypair => private => public
+Message hashu private @ ed25519_sign_uint => MessageSign
+
+<b b{1000100} s, contract-address unpair addr, b{00000} s, b{0} s, MessageSign @ B, Message <s s, b> => ExtMessage
+ExtMessage @ 2 boc+>B file-base +"-ext-" operation $+ +".boc" dup => filename B>file
+cr ^green ."External message query saved to file " ^yellow filename @ type ^green ."!" cr ^reset
+."You should directly send this file to the network as a BoC query." cr
+."  (for example using sendfile command in lite-client)!" cr cr
+
+} case internal {
+// Internal message
+Message 2 boc+>B file-base +"-int-" operation $+ +".boc" dup => filename B>file
+cr ^green ."Query message body saved to " ^yellow filename @ type ^green ."!" cr ^reset
+."You can embed this query with your wallet controlling script" cr
+."  (for example -B in stock wallet) and send it to DSP SC!" cr cr
+} case } switch
