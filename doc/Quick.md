@@ -197,7 +197,30 @@ After creating the query, some amount of Grams (like 5-10 to be safe) should be 
 
 Control messages (both external that must be sent directly and internal that shall be embedded into wallet query) are generated with help of `dsp-control.fif` script. It contains a wide range of options that allow to build any desired control message for the smart contract:
 
-*WIP*
+| Short | Long parameter str   | Description                                                  |
+| ----- | -------------------- | ------------------------------------------------------------ |
+| -e    | --ext                | Conducts generation of external message for controlling the contract, must be followed by operation name to be carried out |
+| -i    | --int                | Conducts generation of internal message for controlling the contract, must be followed by operation name to be carried out |
+| *-n*  | *--box-name*         | Box name to be manipulated                                   |
+| *-k*  | *--keyfile-base*     | Base of key file for signing external messages               |
+| *-p*  | *--protected-frt*    | New value of global FRT timer to be set                      |
+| *-t*  | *--box-value-text*   | *bset*: new string value to save to box                      |
+| *-v*  | *--box-value-boc*    | *bset*: BoC file name to save to box                         |
+| *-o*  | *--no-owner*         | *bnew / bset*: removes owner from the box                    |
+| *-O*  | *--set-owner*        | *bnew / bset*: sets specified address as box owner           |
+| *-q*  | *--no-quota*         | *bnew / bset*: disables quota limits of the box              |
+| *-Q*  | *--set-quota*        | *bnew / bset*: sets quota limits for box (in cells:bits format) |
+| *-g*  | *--deny-get*         | *bnew / bset*: prevents querying box via getter method       |
+| *-G*  | *--allow-get*        | *bnew / bset*: allows querying box via getter method         |
+| *-r*  | *--deny-inquiry*     | *bnew / bset*: prevents obtaining box data via int msg inquiry |
+| *-R*  | *--allow-inquiry*    | *bnew / bset*: allows obtaining box data via int msg inquiry |
+| *-l*  | *--deny-inline*      | *bnew / bset*: prevents injecting box data into forwarded int msg |
+| *-L*  | *--allow-inline*     | *bnew / bset*: allows injecting box data into forwarded int msg |
+| *-K*  | *--new-keyfile-base* | *chow*: keyfile name containing new owner's key              |
+| *-a*  | *--contract-address* | *external*: contract address to save messages to             |
+|       | `<savefile>`         | Base filename to save BoC (appended with type and command)   |
+
+Supported method names can be read in technical details of this contract or easily acquired by calling help method (for example, `-e help` for list of external methods and `-i help` for list of internal methods)
 
 ### Testing
 
