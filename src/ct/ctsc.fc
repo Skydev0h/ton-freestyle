@@ -11,7 +11,7 @@
 ;; Custom ASM instructions                                                   ;;
 ;;===========================================================================;;
 
-int buy_gas(int grams) asm "BUYGAS";
+int buy_gas(int grams) impure asm "BUYGAS";
 (slice, int) dict_get?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTGET" "NULLSWAPIFNOT";
 (cell, int) dict_delete?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTDEL";
 ;; forall X -> (tuple, X) tpop(tuple list) asm "TPOP";
@@ -82,9 +82,9 @@ int [controller_addr](tuple data)  asm "11 INDEX";
 int [beneficiary_wc](tuple data)   asm "12 INDEX";
 int [beneficiary_addr](tuple data) asm "13 INDEX";
 
-(tuple, ()) ~[flags_pack=](tuple data, int flags) impure asm "6 SETINDEX";
-(tuple, ()) ~[investors=](tuple data, cell invs) impure asm "7 SETINDEX";
-(tuple, ()) ~[beneficiaries=](tuple data, cell bens) impure asm "8 SETINDEX";
+(tuple, ()) ~[flags_pack=](tuple data, int flags) asm "6 SETINDEX";
+(tuple, ()) ~[investors=](tuple data, cell invs) asm "7 SETINDEX";
+(tuple, ()) ~[beneficiaries=](tuple data, cell bens) asm "8 SETINDEX";
 
 ;;===========================================================================;;
 

@@ -537,6 +537,9 @@ recv_internal PROC:<{
     s10 s9 XCHG2
     DROP
   }>
+  DUP
+  BUYGAS
+  DROP
   s1 s10 XCHG
   SUB
   s8 PUSH

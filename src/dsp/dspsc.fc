@@ -62,13 +62,13 @@ int [protected_frt](tuple data) asm "4 INDEX";
 int [new_frt_value](tuple data) asm "5 INDEX";
 int [new_frt_timer](tuple data) asm "6 INDEX";
 
-(tuple, ()) ~[flags=](tuple data, int v)         impure asm "0 SETINDEX";
-(tuple, ()) ~[box_tree=](tuple data, cell v)     impure asm "1 SETINDEX";
-(tuple, ()) ~[seq_no=](tuple data, int v)        impure asm "2 SETINDEX";
-(tuple, ()) ~[owner_key=](tuple data, int v)     impure asm "3 SETINDEX";
-(tuple, ()) ~[protected_frt=](tuple data, int v) impure asm "4 SETINDEX";
-(tuple, ()) ~[new_frt_value=](tuple data, int v) impure asm "5 SETINDEX";
-(tuple, ()) ~[new_frt_timer=](tuple data, int v) impure asm "6 SETINDEX";
+(tuple, ()) ~[flags=](tuple data, int v)         asm "0 SETINDEX";
+(tuple, ()) ~[box_tree=](tuple data, cell v)     asm "1 SETINDEX";
+(tuple, ()) ~[seq_no=](tuple data, int v)        asm "2 SETINDEX";
+(tuple, ()) ~[owner_key=](tuple data, int v)     asm "3 SETINDEX";
+(tuple, ()) ~[protected_frt=](tuple data, int v) asm "4 SETINDEX";
+(tuple, ()) ~[new_frt_value=](tuple data, int v) asm "5 SETINDEX";
+(tuple, ()) ~[new_frt_timer=](tuple data, int v) asm "6 SETINDEX";
 
 int Flag:HasOwner()      asm "1 PUSHINT";
 int Flag:!HasOwner()     asm "254 PUSHINT";
@@ -123,13 +123,13 @@ int [quota_bits](tuple data)  asm "4 INDEX";
 int [fr_timeout](tuple data)  asm "5 INDEX";
 cell [data](tuple data)       asm "6 INDEX";
 
-;; (tuple, ()) ~[flags=](tuple data, int v)    impure asm "0 SETINDEX";
-(tuple, ()) ~[owner_wc=](tuple data, int v)    impure asm "1 SETINDEX";
-(tuple, ()) ~[owner_addr=](tuple data, int v)  impure asm "2 SETINDEX";
-(tuple, ()) ~[quota_cells=](tuple data, int v) impure asm "3 SETINDEX";
-(tuple, ()) ~[quota_bits=](tuple data, int v)  impure asm "4 SETINDEX";
-(tuple, ()) ~[fr_timeout=](tuple data, int v)  impure asm "5 SETINDEX";
-(tuple, ()) ~[data=](tuple data, cell v)       impure asm "6 SETINDEX";
+;; (tuple, ()) ~[flags=](tuple data, int v)    asm "0 SETINDEX";
+(tuple, ()) ~[owner_wc=](tuple data, int v)    asm "1 SETINDEX";
+(tuple, ()) ~[owner_addr=](tuple data, int v)  asm "2 SETINDEX";
+(tuple, ()) ~[quota_cells=](tuple data, int v) asm "3 SETINDEX";
+(tuple, ()) ~[quota_bits=](tuple data, int v)  asm "4 SETINDEX";
+(tuple, ()) ~[fr_timeout=](tuple data, int v)  asm "5 SETINDEX";
+(tuple, ()) ~[data=](tuple data, cell v)       asm "6 SETINDEX";
 
 int Op:BoxNew()    asm "1651402103 PUSHINT";
 int Op:BoxDelete() asm "1650746732 PUSHINT";
