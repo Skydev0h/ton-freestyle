@@ -51,7 +51,7 @@
 
 // Default values
 [[ "msg-mode" "box-name" "keyfile-base" "protected-frt" "box-value" "val-owner" "val-quota"
-   "new-keyfile-base" "contract-address" "box-value-text" "box-value-boc" "new-key" null ]]-vars
+   "new-keyfile-base" "contract-address" "box-value-text" "box-value-boc" "new-key" "seq-no" null ]]-vars
    
 [[ "operation" "" ]]-vars
 
@@ -65,7 +65,7 @@ begin-options ""
 	+tab +"[-t <box-value-text>] [-v <box-value-boc>] " +cr
 	+tab +"[-o | -O <owner-address>] [-q | -Q <quota>]" +cr 
 	+tab +"[-g | -G] [-r | -R] [-l | -L] [-K <new-keyfile-base>]" +cr 
-	+tab +"[-a <contract-address>] -- <savefile>" +cr +cr
+	+tab +"[-a <contract-address>] [-s <seq-no>] -- <savefile>" +cr +cr
 	+tab +"Generates a control request to data storage proxy smart-contract" +cr
 	+tab +"Request will be saved to <savefile>-<ext|int>-<type>.boc." +cr
 	+tab +"Please refer to documentation (quick start) for detailed information about params" +cr
@@ -127,12 +127,15 @@ begin-options ""
 	  
 	"a" "--contract-address" { input(addr) 2=> contract-address } short-long-option-arg
 	  "[For all external operations] Specifies destination contract address or @filename.addr" option-help
+	  
+	"s" "--seq-no" { input(int) => seq-no } short-long-option-arg
+	  "[For all external operations] Current anti-replay sequence number of contract" option-help
 	
 parse-options
 
 [[ "msg-mode" "box-name" "keyfile-base" "protected-frt" "val-owner" "val-quota"
    "new-keyfile-base" "contract-address" "box-value-text" "box-value-boc" "operation"
-   "set-flags" "rst-flags" ]]-stone
+   "set-flags" "rst-flags" "seq-no" ]]-stone
 
 msg-mode null? ' usage if
 
@@ -199,10 +202,10 @@ new-keyfile-base null? {
   0xFF { ."]" } &case
 } switch  } : listflags
 
-{ dup => op-id 32 u, } : =>op
+{ swap seq-no 32 u, swap dup => op-id 32 u, } : =>op
 <b =:> Body
 { 2 pick rot $= swap Body @ -rot if => Body } : <$case>
-{ <b box-name $, b> ref, ^cyan ."Selected box name: " ^yellow box-name type ^reset cr } : boxname,
+{ <b box-name $, 0 8 u, b> ref, ^cyan ."Selected box name: " ^yellow box-name type ^reset cr } : boxname,
 { any-flags 0 = and abort"No configuration changes are set, empty change request is useless"
   set-flags 8 u, rst-flags 8 u,
   ^green ."Flags to  set : " ^yellow set-flags listflags ^reset cr
@@ -217,7 +220,7 @@ new-keyfile-base null? {
 
 msg-mode {
 	external {
-		[[ "contract-address" "keyfile-base" ]]-req
+		[[ "contract-address" "keyfile-base" "seq-no" ]]-req
 		^cyan ."Selected operation (external message): " ^reset
 		operation {
 			"chow" { ^magenta ."chow" ^reset .": Changes contract owner public key" cr

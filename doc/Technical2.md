@@ -135,7 +135,7 @@ For `bset`, `bcfg`, and `prot` parameters are the same as for external message (
 
 `inqu` shall contain reference to box name cell and response message body, that will be put into response message. Therefore, response message body will be `resp_msg_body` + `ref to cell data`.
 
-`prox` is more complex in it's nature. You need to provide inline destination address (8 bits `workchain id` and 256 bits `address`), box value mode bit (`1` to insert as reference and `0` to insert inline) reference to box name, reference to `prefix` and reference to `suffix` cells.
+`prox` is more complex in it's nature. You need to provide inline destination address (8 bits `workchain id` and 256 bits `address`), box value mode bit (`0` to insert as reference and `1` to insert inline) reference to box name, reference to `prefix` and reference to `suffix` cells.
 
 The sent message will contain all provided grams minus processing and forwarding fees, and will have following body: inline `prefix` + inline or referenced `box value` + inline `suffix`. Providing correct prefix, suffix and inlining mode so that as no build overflow error occurs is responsibility of the sender.
 

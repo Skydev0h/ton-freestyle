@@ -50,3 +50,27 @@ Anyone can call getter functions `get_box` and `get_box_value` to obtain box met
 
 Box value can also be used as a response to internal message (`inqu` operation) or be injected into a proxied (forwarded) message (`prox` operation). Please check technical details.
 
+### Application use cases
+
+There are some use cases of such contract, that may or may not be interesting. Lets think about them. This contract may not be all that super user friendly and useful like (sigh) games or gambling, but it may get it's place in the core of something way more impressive and useful.
+
+#### Page (what what web???) server
+
+Primitively and very ineffectively an arbitrary whateverML text can be stored in data cells, be retrieved with get methods when needed and be displayed to user. Is not very effective use of on-blockchain data, I think we will see much more interesting implementation of such services sitting on top of ADNL directly soon.
+
+#### Referential storage
+
+More useful and interesting example is storing some data that is a reference to something else. For example, when file storage over ADNL be implemented, the box it may contain ADNL server address and file hash or path or something, that would allow to retrieve the file when needed.
+
+Another possibility is storing old plain good HTTP(S) or FTP web address where the file can be retrieved alongside with it's hash to ensure integrity.
+
+#### Templating
+
+Because it is possible to inject value of a box into a forwarded internal message, the smart contract may contain some templates that can be used by another scripts in one or another way. An extreme example of such usage may be *decentralized SC-centralized storage of SC code*. The SC constructor may call this SC to obtain the code to be deployed or some another data. Of course it is expensive in terms of blockchain fees and slow (at least one RT required) but it is possible and may be feasible for some use-cases.
+
+#### Storing some small related data
+
+It may be possible to store some small pieces of information linked to some entity. As a relatively basic example, it may hold marks of students. That way, they will be immutably and provably stored in the blockchain and be easily accessed when needed. The use of templating may even enable a use case, such as injecting a mark into a comment, like this: "Hey, Dude, you received A for your last exam!"
+
+More interesting usage could be storage of some public keys or ADNL addresses for whatever reason (hey, DNS or PKI!), again, reliably and provably. With correct configuration it is even possible to protect some data boxes from potential misbehavior of contract owner.
+

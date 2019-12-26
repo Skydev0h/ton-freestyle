@@ -1,0 +1,74 @@
+#!/usr/bin/fift -s
+
+/*
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #2: Data storage proxy smart contract (DSPSC)                  |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	\------------------------------------------------------------------------/
+*/
+
+"TonUtil.fif" include
+"GetOpt.fif" include
+"Asm.fif" include
+"Color.fif" include
+{ ^red .s ^reset 255 halt } : ^ // inspect stack tool
+
+{ show-options-help 1 halt } : usage
+
+{ find { 1 abort"word not found" } ifnot execute } : resolve
+{ bl word } : next-word
+
+{ next-word 1 { resolve ! } } :: => // assign to right
+{ next-word 1 { resolve -rot pair swap ! } } :: 2=> // assign to right
+{ next-word 1 { hole dup 1 'nop does rot 0 (create) ! } } :: =:> // create variable with default value
+
+{ execute drop } : switch
+{ 2 pick rot  = swap if } : case
+{ 2 pick rot and swap if } : &case
+{ 2 pick rot $= swap if } : $case
+
+{ next-word 1 { dup resolve @ 1 'nop does swap 0 (create) } } :: stone // freezes variable value as constant
+
+// Options 
+begin-options "<dest-addr> <box-name> <boc-pre> <boc-suf> <injmode> <savefile>" +cr +cr
+	+"<dest-addr>: destination address to forward message to in any possible form" +cr
+	+"<box-name>:  box to fetch value from" +cr
+	+"<boc-pre>:   BoC file containing prefix that would be written before box value" +cr
+	+"<boc-suf>:   BoC file containint suffix that would be written after box value" +cr
+	+"<injmode>:   determined box value injection mode, 1 to inline, 0 to write as ref" +cr
+	+"<savefile>:  resulting query will be saved to <savefile>-prox.boc file" +cr
+	generic-help
+	
+parse-options
+
+<b b> 2 boc+>B "empty-cell.boc" B>file
+<b 0 32 u, b> 2 boc+>B "zero32.boc" B>file
+
+$# 6 <> ' usage if
+$1 false parse-load-address drop 2=: dest-addr
+$2 =: box-name
+$3 dup =: prefix-file file>B B>boc =: prefix
+$4 dup =: suffix-file file>B B>boc =: suffix
+$5 parse-int dup 1 ufits not abort"<injmode> must be 0 or 1" =: inj-mode
+$6 =: savefile
+
+."Generating an internal message to " ^yellow ."proxy message" ^reset ." to contract " ^green dest-addr .addr ^reset cr
+."Value of box " ^green box-name type ^reset ." will be injected " 
+^yellow inj-mode { ."as a reference" } { ."inline" } cond ^reset
+." between prefix BoC " ^green prefix-file type ^reset ." and suffix BoC " ^green suffix-file type ^reset cr
+
+<b
+	0x70726f78 32 u, // prox
+	<b box-name $, 0 8 u, b> ref,
+	dest-addr -rot 8 i, swap 256 u,
+	inj-mode 1 u,
+	prefix ref,
+	suffix ref,
+b> =: Message
+
+Message 2 boc+>B savefile +"-prox.boc" dup =: filename B>file
+cr ^green ."Proxy query message body saved to " ^yellow filename type ^green ."!" cr ^reset
+."You can embed this proxy query with your wallet script" cr
+."  (for example -B in stock wallet) and send it to DSP SC!" cr cr
