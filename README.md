@@ -13,9 +13,17 @@ As per project ideas themselves, **two** smart contract projects were chosen to 
 
 More details about those ideas should be read on their respective pages linked above.
 
-**It should be noted that in order to run tests, a patch should be applied**, that adds fift commands `(gas)runvmctxact` that allows **inspecting resulting action register (c5)** after the contract execution to run tests more thoroughly. It may be possible to disable that functionality by swapping comments on first lines, but that is not recommended.
+Update on tests: the changes have been actually **added to the master TON branch** by the TON maintainers, so no patch is needed to utilize test suite to full extent.
 
-Link to the pull request on the TON GitHub repository: [Addition of (gas)runvmctxact(q) functions](https://github.com/ton-blockchain/ton/pull/220).
+Summarizing proposed changes and fixed in [this pull request](https://github.com/ton-blockchain/ton/pull/220) from [this fork](https://github.com/Skydev0h/ton):
+
+| Type of change | Name                | Status       | Description                                                  |
+| -------------- | ------------------- | ------------ | ------------------------------------------------------------ |
+| fift enhance   | (gas)runvmctxact(q) | **accepted** | Added as generalized runvm function that accepts bit flags, fift compatibility layer includes the proposed functions |
+| runvm fix      | commited states     | **accepted** | Fix implemented in runvm code                                |
+| fift enhance   | dict slice key ops  | **accepted** | Implemented as generalized dictionary operations with -1 signed flag indicating slice key |
+| vec tool fix   | -c readline disable | **accepted** | Fixed in a slightly different way                            |
+| func enhance   | -d flag (warnings)  | *not yet...* | Adding a -d flag that warns about any optimized out calls in func |
 
 Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
 
