@@ -24,6 +24,7 @@ Summarizing proposed changes and fixed in [this pull request](https://github.com
 | fift enhance   | dict slice key ops  | **accepted** | Implemented as generalized dictionary operations with -1 signed flag indicating slice key |
 | vec tool fix   | -c readline disable | **accepted** | Fixed in a slightly different way                            |
 | func enhance   | -d flag (warnings)  | *not yet...* | Adding a -d flag that warns about any optimized out calls in func |
+| func enhance   | integer constants   | *not yet...* | Adding a const keyword that allows to define global constants that get their value injected in-place in script instead of const itself |
 
 Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
 
