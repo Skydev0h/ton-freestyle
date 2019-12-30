@@ -17,15 +17,15 @@ Update on tests: the changes have been actually **added to the master TON branch
 
 Summarizing proposed changes and fixed in [this pull request](https://github.com/ton-blockchain/ton/pull/220) from [this fork](https://github.com/Skydev0h/ton):
 
-| Type of change | Name                | Status       | Description                                                  |
-| -------------- | ------------------- | ------------ | ------------------------------------------------------------ |
-| fift enhance   | (gas)runvmctxact(q) | **accepted** | Added as generalized runvm function that accepts bit flags, fift compatibility layer includes the proposed functions |
-| runvm fix      | commited states     | **accepted** | Fix implemented in runvm code                                |
-| fift enhance   | dict slice key ops  | **accepted** | Implemented as generalized dictionary operations with -1 signed flag indicating slice key |
-| vec tool fix   | -c readline disable | **accepted** | Fixed in a slightly different way                            |
-| func enhance   | -d flag (warnings)  | *not yet...* | Adding a -d flag that warns about any optimized out calls in func |
-| func enhance   | integer constants   | *not yet...* | Adding a `const` keyword that allows to define global constants that get their value injected in-place in script instead of const itself |
-| func enhance   | include keyword     | *not yet...* | Added `include` keyword that allows to include another func source file. |
+| Type of change | Name                                                         | Status       | Description                                                  |
+| -------------- | ------------------------------------------------------------ | ------------ | ------------------------------------------------------------ |
+| fift enhance   | [(gas)runvmctxact(q)](https://github.com/ton-blockchain/ton/pull/220/commits/7572b6cbec1ed255a10fcb6031635e47a865e10c) | **accepted** | Added as generalized runvm function that accepts bit flags, fift compatibility layer includes the proposed functions |
+| runvm fix      | [commited states](https://github.com/ton-blockchain/ton/pull/220/commits/03857adfa55354368a064be0361ec093c854bde3) | **accepted** | Fix implemented in runvm code                                |
+| fift enhance   | [dict slice key ops](https://github.com/ton-blockchain/ton/pull/220/commits/22f32e13bef22be6ffc94f9dd481a0ca7df62790) | **accepted** | Implemented as generalized dictionary operations with -1 signed flag indicating slice key |
+| vec tool fix   | [-c readline disable](https://github.com/ton-blockchain/ton/pull/220/commits/4a1ea66bdbc84abd313f6419b8e0490bc9d08b54) | **accepted** | Fixed in a slightly different way                            |
+| func enhance   | [-d flag (warnings)](https://github.com/ton-blockchain/ton/pull/220/commits/78327e336c997ed089aa4e5a00e7b5a673296fcb) | *not yet...* | Adding a -d flag that warns about any optimized out calls in func |
+| func enhance   | [integer constants](https://github.com/ton-blockchain/ton/pull/220/commits/96db65382797c91b3c2c513f7ea15cf7d303f69b) | *not yet...* | Adding a `const` keyword that allows to define global constants that get their value injected in-place in script instead of const itself |
+| func enhance   | [include keyword](https://github.com/ton-blockchain/ton/pull/220/commits/469fcd12d9294c1e3e9e40f4cf80d27e379b5593) | *not yet...* | Added `include` keyword that allows to include another func source file. |
 
 Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
 
