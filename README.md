@@ -15,7 +15,11 @@ More details about those ideas should be read on their respective pages linked a
 
 Update on tests: the changes have been actually **added to the master TON branch** by the TON maintainers, so no patch is needed to utilize test suite to full extent.
 
-Summarizing proposed changes and fixed in [this pull request](https://github.com/ton-blockchain/ton/pull/220) from [this fork](https://github.com/Skydev0h/ton):
+Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
+
+Technical details about implementations are on their corresponding pages.
+
+Summarizing proposed changes and fixed in [this pull request](https://github.com/ton-blockchain/ton/pull/220) (and others) from [this fork](https://github.com/Skydev0h/ton):
 
 | Type of change | Name                                                         | Status       | Description                                                  |
 | -------------- | ------------------------------------------------------------ | ------------ | ------------------------------------------------------------ |
@@ -23,15 +27,10 @@ Summarizing proposed changes and fixed in [this pull request](https://github.com
 | runvm fix      | [commited states](https://github.com/ton-blockchain/ton/pull/220/commits/03857adfa55354368a064be0361ec093c854bde3) | **accepted** | Fix implemented in runvm code                                |
 | fift enhance   | [dict slice key ops](https://github.com/ton-blockchain/ton/pull/220/commits/22f32e13bef22be6ffc94f9dd481a0ca7df62790) | **accepted** | Implemented as generalized dictionary operations with -1 signed flag indicating slice key |
 | vec tool fix   | [-c readline disable](https://github.com/ton-blockchain/ton/pull/220/commits/4a1ea66bdbc84abd313f6419b8e0490bc9d08b54) | **accepted** | Fixed in a slightly different way                            |
-| func enhance   | -u flags (warnings)*                                         | *not yet...* | Adding a -u and -uu flags that warn about unused variables and calls in func |
-| func enhance   | [integer constants](https://github.com/ton-blockchain/ton/pull/220/commits/96db65382797c91b3c2c513f7ea15cf7d303f69b) | *not yet...* | Adding a `const` keyword that allows to define global constants that get their value injected in-place in script instead of const itself |
-| func enhance   | [include keyword](https://github.com/ton-blockchain/ton/pull/220/commits/469fcd12d9294c1e3e9e40f4cf80d27e379b5593) and a [relative fix](https://github.com/Skydev0h/ton/commit/48191db4ddaad0a2e57f0abeb28da3fc77f35cef) | *not yet...* | Added `include` keyword that allows to include another func source file. |
-
-* About -u flags commits: [initial](https://github.com/Skydev0h/ton/commit/78327e336c997ed089aa4e5a00e7b5a673296fcb), [replacement detection](https://github.com/Skydev0h/ton/commit/67d3d21c5268f72718ab831cb0bd4c8176de36e2), [fix1 (condition)](https://github.com/Skydev0h/ton/commit/9e920e1e2dc39dcc96ef046883e103ca2c9acfd3), [fix2 (logic)](https://github.com/Skydev0h/ton/commit/713fa138bed2d52fc7bbd8227de758b54c08e288)
-
-Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
-
-Technical details about implementations are on their corresponding pages.
+| func enhance   | [-u flags (warnings)](https://github.com/ton-blockchain/ton/pull/229) | *not yet...* | Adding a -u and -uu flags that warn about unused variables and calls in func |
+| func enhance   | [integer constants](https://github.com/ton-blockchain/ton/pull/227) | *not yet...* | Adding a `const` keyword that allows to define global constants that get their value injected in-place in script instead of const itself |
+| func enhance   | [include keyword](https://github.com/ton-blockchain/ton/pull/228) | *not yet...* | Added `include` keyword that allows to include another func source file. |
+| fift asm enh   | [unused procs opt](https://github.com/ton-blockchain/ton/pull/230) | *not yet...* | Improved TVM assembler fift library with detection of unused procedures and more |
 
 There were some other ideas, that were trashed for one or another reason, due to low subjective usefulness, high complexity or unprepared infrastructure, you can get acquainted with them [here](doc/Unchosen.md), if interested.
 
