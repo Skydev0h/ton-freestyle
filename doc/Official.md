@@ -58,6 +58,24 @@ The deadline for submissions is **Dec 22, 23:50 Dubai Time**.
 
 2. Submissions for the **Data Clustering Contest** can now be tested on the second evaluation data set. (raw, en, ru)
 
+---
+
+
+
+## [Contestants summary after deadline](https://t.me/contest/145)
+
+We received a total of **37** submissions from **27** contestants for the second stage of the [Blockchain Contest](https://t.me/contest/139). 
+
+All submissions are now available for public testing on https://contest.com/blockchain-2
+
+Everyone is welcome to leave their feedback while our judges evaluate the entries. We ask the contestants to add a comment with a brief description of their projects. 
+
+Good luck!
+
+---
+
+
+
 
 
 ## [TON Documentation](https://test.ton.org)
