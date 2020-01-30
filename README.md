@@ -32,6 +32,7 @@ Summarizing proposed changes and fixed in [this pull request](https://github.com
 | func enhance   | [include keyword](https://github.com/ton-blockchain/ton/pull/228) | *not yet...* | Added `include` keyword that allows to include another func source file. |
 | fift asm enh   | [unused procs opt](https://github.com/ton-blockchain/ton/pull/230) | *not yet...* | Improved TVM assembler fift library with detection of unused procedures and more |
 | fift enhance   | [error backtrace](https://github.com/ton-blockchain/ton/pull/231) | *not yet...* | Added a `-t` flag that displays backtrace of error and if `-tt` is used stack dumps |
+| func enhance   | [implicit functions](https://github.com/ton-blockchain/ton/pull/236) | *not yet...* | Added `implicit` functions that do not need to be followed by args and even `()` tuple. |
 
 There were some other ideas, that were trashed for one or another reason, due to low subjective usefulness, high complexity or unprepared infrastructure, you can get acquainted with them [here](doc/Unchosen.md), if interested.
 
