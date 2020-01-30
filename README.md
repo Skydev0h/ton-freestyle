@@ -17,6 +17,12 @@ Update on tests: the changes have been actually **added to the master TON branch
 
 Quick-start instructions about using those contracts can be found [here](doc/Quick.md).
 
+---
+
+**NEW!** Refactored scripts using the *not yet implemented* functionality have been added with `-fcext` suffix! Please check them out! More information in the aforementioned *quick-start instructions*.
+
+---
+
 Technical details about implementations are on their corresponding pages.
 
 Summarizing proposed changes and fixed in [this pull request](https://github.com/ton-blockchain/ton/pull/220) (and others) from [this fork](https://github.com/Skydev0h/ton):

@@ -6,6 +6,14 @@ Lets assume for this document that `fift` interpreter is in system binary path, 
 
 [Data storage proxy SC](#Data storage proxy SC) is below the section about conditional transfer SC.
 
+## Extended FunC script variants
+
+As the latest refactoring and change scripts were made a LOT more concise.
+
+The corresponding sources are `ctsc-fcext.fc` and `dspsc-fcext.fc` and require `bleeding-edge` branch of my `ton` fork to compile (not yet included FunC extensions).
+
+A nice demonstration of those new features.
+
 ## Conditional transfer SC
 
 ### Overview

@@ -1,0 +1,557 @@
+{-
+	/------------------------------------------------------------------------\
+	| Created for: Telegram (Open Network) Blockchain Contest #2 (Freestyle) |
+	| Project #2: Data storage proxy smart contract (DSPSC)                  |
+	>------------------------------------------------------------------------<
+	| December 2019, second half (Happy New Year!)                           |
+	| January 2020: Refactored to skydev:bleeding-edge branch goodies        |
+	>------------------------------------------------------------------------<
+	| the branch: https://github.com/Skydev0h/ton/tree/bleeding-edge         |
+	| const keyword: https://github.com/ton-blockchain/ton/pull/227          |
+	| include keyword: https://github.com/ton-blockchain/ton/pull/228        |
+	| implicit keyword: https://github.com/ton-blockchain/ton/pull/236       |
+	\------------------------------------------------------------------------/
+-}
+
+include "../stdlib.fc";
+
+;;===========================================================================;;
+;; Custom ASM instructions                                                   ;;
+;;===========================================================================;;
+
+(builder, ()) ~store_ref(builder b, cell c) asm(c b) "STREF";
+(builder, ()) ~store_slice(builder b, slice s) asm "STSLICER";
+(builder, ()) ~store_grams(builder b, int x) asm "STGRAMS";
+(builder, ()) ~store_dict(builder b, cell c) asm(c b) "STDICT";
+
+int buy_gas(int grams) asm "BUYGAS";
+(slice, int) dict_get?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTGET" "NULLSWAPIFNOT";
+(cell, int) dict_delete?(cell dict, int key_len, slice key) asm(key dict key_len) "DICTDEL";
+;; forall X -> (tuple, X) tpop(tuple list) asm "TPOP";
+
+;; Args: s D n | Success: s' x s'' -1 | Failure: s 0 -> s N N 0
+(slice, slice, slice, int) pfxdict_get?(cell dict, int key_len, slice key) 
+		asm(key dict key_len) "PFXDICTGETQ" "NULLSWAPIFNOT" "NULLSWAPIFNOT";
+
+;; Args: x k D n | Success: D' -1 | Failure: D 0
+(cell, int) pfxdict_set?(cell dict, int key_len, slice key, slice value) 
+		asm(value key dict key_len) "PFXDICTSET";
+
+;; Args: k D n | Success: D' -1 | Failure: D 0
+(cell, int) pfxdict_delete?(cell dict, int key_len, slice key) 
+		asm(key dict key_len) "PFXDICTDEL";
+
+;;===========================================================================;;
+;; Constants, structures                                                     ;;
+;;===========================================================================;;
+
+const FRT:MinimumTimer = 86400;
+const FRT:InitialTimerBase = 604800;
+
+;;  Bit length
+const BL:Flags     = 7;
+const BL:SeqNumber = 32;
+const BL:ChainId   = 8;
+const BL:Address   = 256;
+const BL:PublicKey = BL:Address;
+const BL:MsgFlags  = 4;
+const BL:OpLength  = 32;
+const BL:Signature = 512;
+const BL:FRT       = 24;
+const BL:BoxFlags  = 8;
+const BL:UnixTime  = 32;
+const BL:PrefixKey = 1023;
+
+;;  Message flag
+const MF:AddTranFees  = 1;
+const MF:IgnoreErrors = 2;
+const MF:MsgBalance   = 64;
+const MF:AllBalance   = 128;
+
+const Flag:ChangingFRT = 1;
+const Flag:!ChangingFRT = 126;
+int .ChangingFRT?(int a)    implicit asm "1 PUSHINT AND";
+int .NotChangingFRT?(int a) implicit asm "1 PUSHINT AND ISZERO";
+
+tuple PackStorage (int flags, cell box_tree, int seq_no, int owner_key,
+	               int protected_frt, int new_frt_value, int new_frt_timer) asm "7 TUPLE";
+				   
+(int, cell, int, int, int, int, int) UnpackStorage(tuple data) asm "7 UNTUPLE";
+
+int [flags](tuple data)         implicit asm "0 INDEX";
+cell [box_tree](tuple data)     implicit asm "1 INDEX";
+int [seq_no](tuple data)        implicit asm "2 INDEX";
+int [owner_key](tuple data)     implicit asm "3 INDEX";
+int [protected_frt](tuple data) implicit asm "4 INDEX";
+int [new_frt_value](tuple data) implicit asm "5 INDEX";
+int [new_frt_timer](tuple data) implicit asm "6 INDEX";
+
+(tuple, ()) ~[flags]=(tuple data, int v)         asm "0 SETINDEX";
+(tuple, ()) ~[box_tree]=(tuple data, cell v)     asm "1 SETINDEX";
+(tuple, ()) ~[seq_no]=(tuple data, int v)        asm "2 SETINDEX";
+(tuple, ()) ~[owner_key]=(tuple data, int v)     asm "3 SETINDEX";
+(tuple, ()) ~[protected_frt]=(tuple data, int v) asm "4 SETINDEX";
+(tuple, ()) ~[new_frt_value]=(tuple data, int v) asm "5 SETINDEX";
+(tuple, ()) ~[new_frt_timer]=(tuple data, int v) asm "6 SETINDEX";
+
+const Flag:HasOwner  = 1;
+const Flag:!HasOwner = 254;
+int .HasOwner?(int a)    implicit asm "1 PUSHINT AND";
+int .HasNoOwner?(int a)  implicit asm "1 PUSHINT AND ISZERO";
+
+const Flag:Frozen  = 2;
+const Flag:!Frozen = 253;
+int .Frozen?(int a)      implicit asm "2 PUSHINT AND";
+int .NotFrozen?(int a)   implicit asm "2 PUSHINT AND ISZERO";
+
+const Flag:UseQuota  = 4;
+const Flag:!UseQuota = 251;
+int .UseQuota?(int a)    implicit asm "4 PUSHINT AND";
+int .NoQuota?(int a)     implicit asm "4 PUSHINT AND ISZERO";
+
+const Flag:Protected  = 8;
+const Flag:!Protected = 247;
+int .Protected?(int a)   implicit asm "8 PUSHINT AND";
+int .Unprotected?(int a) implicit asm "8 PUSHINT AND ISZERO";
+
+const Flag:AllowInquiry  = 16;
+const Flag:!AllowInquiry = 239;
+int .AllowInquiry?(int a) implicit asm "16 PUSHINT AND";
+int .DenyInquiry?(int a)  implicit asm "16 PUSHINT AND ISZERO";
+
+const Flag:AllowInline  = 32;
+const Flag:!AllowInline = 223;
+int .AllowInline?(int a)  implicit asm "32 PUSHINT AND";
+int .DenyInline?(int a)   implicit asm "32 PUSHINT AND ISZERO";
+
+const Flag:AllowGet  = 64;
+const Flag:!AllowGet = 191;
+int .AllowGet?(int a)     implicit asm "64 PUSHINT AND";
+int .DenyGet?(int a)      implicit asm "64 PUSHINT AND ISZERO";
+
+const Flag:FRPending  = 128;
+const Flag:!FRPending = 127;
+int .FRPending?(int a)    implicit asm "128 PUSHINT AND";
+int .FRNotPending?(int a) implicit asm "128 PUSHINT AND ISZERO";
+
+tuple PackBox (int flags, int owner_wc, int owner_addr, int quota_cells, int quota_bits,
+               int fr_timeout, cell data) asm "7 TUPLE";
+			   
+(int, int, int, int, int, int, cell) UnpackBox(tuple box) asm "7 UNTUPLE";
+
+;; int [flags](tuple data)    implicit asm "0 INDEX";
+int [owner_wc](tuple data)    implicit asm "1 INDEX";
+int [owner_addr](tuple data)  implicit asm "2 INDEX";
+int [quota_cells](tuple data) implicit asm "3 INDEX";
+int [quota_bits](tuple data)  implicit asm "4 INDEX";
+int [fr_timeout](tuple data)  implicit asm "5 INDEX";
+cell [data](tuple data)       implicit asm "6 INDEX";
+
+;; (tuple, ()) ~[flags]= (tuple data, int v)    asm "0 SETINDEX";
+(tuple, ()) ~[owner_wc]=(tuple data, int v)    asm "1 SETINDEX";
+(tuple, ()) ~[owner_addr]=(tuple data, int v)  asm "2 SETINDEX";
+(tuple, ()) ~[quota_cells]=(tuple data, int v) asm "3 SETINDEX";
+(tuple, ()) ~[quota_bits]=(tuple data, int v)  asm "4 SETINDEX";
+(tuple, ()) ~[fr_timeout]=(tuple data, int v)  asm "5 SETINDEX";
+(tuple, ()) ~[data]=(tuple data, cell v)       asm "6 SETINDEX";
+
+const Op:BoxNew    = 0x626E6577;
+const Op:BoxDelete = 0x6264656C;
+const Op:Freeze    = 0x66727A7A;
+const Op:Thaw      = 0x74686177;
+const Op:Protect   = 0x70726F74;
+const Op:ForceRes  = 0x66726573;
+const Op:BoxSet    = 0x62736574;
+const Op:BoxConfig = 0x62636667;
+const Op:ChOwner   = 0x63686F77;
+const Op:ChangeFRT = 0x63686672;
+const Op:Unprotect = 0x756E7072;
+
+const Op:Inquiry   = 0x696E7175;
+const Op:Proxy     = 0x70726F78;
+
+;;===========================================================================;;
+
+tuple Storage:Load() inline_ref {
+	slice cs = get_data().begin_parse();
+	
+	int flags         = cs~load_uint(BL:Flags);
+	cell box_tree     = cs~load_dict();
+	int seq_no        = cs~load_uint(BL:SeqNumber);
+	int owner_key     = cs~load_uint(BL:PublicKey);
+	int protected_frt = cs~load_uint(BL:FRT);
+	int new_frt_value = 0;
+	int new_frt_timer = 0;
+	if (flags.ChangingFRT?) {
+		new_frt_value = cs~load_uint(BL:FRT);
+		new_frt_timer = cs~load_uint(BL:UnixTime);
+	}
+	cs.end_parse();
+	return PackStorage(
+		flags, box_tree, seq_no, owner_key, 
+		protected_frt, new_frt_value, new_frt_timer
+	);
+}
+
+() Storage:Save(tuple data) impure inline_ref {
+	(int flags, cell box_tree, int seq_no, int owner_key,
+	 int protected_frt, int new_frt_value, int new_frt_timer) = UnpackStorage(data);
+	 builder bld = begin_cell()
+	         .store_uint(flags, BL:Flags)
+	         .store_dict(box_tree)
+			 .store_uint(seq_no, BL:SeqNumber)
+			 .store_uint(owner_key, BL:PublicKey)
+			 .store_uint(protected_frt, BL:FRT);
+	if (flags.ChangingFRT?) {
+		bld~store_uint(new_frt_value, BL:FRT);
+		bld~store_uint(new_frt_timer, BL:UnixTime);
+	}
+	set_data(bld.end_cell());
+}
+
+;;===========================================================================;;
+
+tuple Box:Load(slice cs) {
+	int flags = cs~load_uint(BL:BoxFlags);
+	int owner_wc = 0;
+	int owner_addr = 0;
+	if (flags.HasOwner?) {
+		owner_wc    = cs~load_int(BL:ChainId);
+		owner_addr  = cs~load_uint(BL:Address);
+	}
+	int quota_cells = 0;
+	int quota_bits  = 0;
+	if (flags.UseQuota?) {
+		quota_cells = cs~load_grams();
+		quota_bits  = cs~load_grams();
+	}
+	int fr_timeout  = 0;
+	if (flags.FRPending?) {
+		fr_timeout  = cs~load_uint(BL:UnixTime);
+	}
+	cell data = cs~load_ref();
+	return PackBox(
+		flags, owner_wc, owner_addr, 
+		quota_cells, quota_bits, fr_timeout, data
+	);
+}
+
+slice Box:Save(tuple data) impure inline_ref {
+	(int flags, int owner_wc, int owner_addr, 
+	 int quota_cells, int quota_bits,
+     int fr_timeout, cell data) = UnpackBox(data);
+	builder bld = begin_cell().store_uint(flags, BL:BoxFlags);
+	if (flags.HasOwner?) {
+		bld~store_int(owner_wc, BL:ChainId);
+		bld~store_uint(owner_addr, BL:Address);
+	}
+	if (flags.UseQuota?) {
+		bld~store_grams(quota_cells);
+		bld~store_grams(quota_bits);
+	}
+	if (flags.FRPending?) {
+		bld~store_uint(fr_timeout, BL:UnixTime);
+	}
+	bld~store_ref(data);
+	return bld.end_cell().begin_parse();
+}
+
+() Box:Store(tuple bdata, cell root, tuple data, slice name) impure inline_ref {
+	slice box = Box:Save(bdata);
+	throw_unless(31, root~pfxdict_set?(BL:PrefixKey, name, box));	
+	data~[box_tree]= root;
+	Storage:Save(data);
+}
+
+tuple Box:Configure(tuple box, slice query, int admin) {
+	int set_flags = query~load_uint(BL:BoxFlags);
+	int rst_flags = query~load_uint(BL:BoxFlags);
+	throw_if(51, (set_flags & rst_flags));
+	int any_flags = set_flags | rst_flags;
+	int flags = box.[flags];
+	throw_if(52, (any_flags & 0x8A)); ;; Frozen Protected FRPending
+	if (admin == 0) {
+		throw_if(52, (any_flags & 0x8F)); ;; All but Allows
+	}
+	if ((flags.Protected? != 0) & admin) {
+		throw_if(52, ((set_flags & Flag:UseQuota) != 0) & ((flags & Flag:UseQuota) == 0));
+		throw_if(52, (any_flags & Flag:HasOwner));
+		throw_if(52, (rst_flags & 0x70)); ;; Allows
+	}
+	flags = flags | set_flags & (255 - rst_flags);
+	box~[flags]= flags;
+	if (set_flags.HasOwner?) {
+		int new_wcid = query~load_int(BL:ChainId);
+		int new_addr = query~load_uint(BL:Address);
+		box~[owner_wc]= new_wcid;
+		box~[owner_addr]= new_addr;
+	}
+	if (set_flags.UseQuota?) {
+		int new_qcells = query~load_grams();
+		int new_qbits  = query~load_grams();
+		if ((flags.Protected? != 0) & admin) {
+			throw_if(53, (new_qcells < box.[quota_cells]) & (new_qcells != 0));	
+			throw_if(53, (new_qbits < box.[quota_bits]) & (new_qbits != 0));	
+			throw_if(53, (new_qcells > 0) & (box.[quota_cells] == 0));
+			throw_if(53, (new_qbits > 0) & (box.[quota_bits] == 0));
+		}
+		box~[quota_cells]= new_qcells;
+		box~[quota_bits]= new_qbits;
+	}
+	return box;
+}
+
+() Message:Send(int wc, int addr, int grams, int mode, slice prefix, cell data, slice suffix) impure {
+	;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool 
+	;;                src:MsgAddress -> 01 b 000 0x18 | 100
+	;;                NO BOUNCE: 010000100
+	var msg = begin_cell()
+		.store_uint(0x84, 9) ;; NO BOUNCE: 0 1000 100, bounce: 0xC4
+		.store_int(wc, BL:ChainId)
+		.store_uint(addr, BL:Address)
+		.store_grams(grams)
+		.store_uint (0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+	if (prefix.null?() == 0) {
+		msg~store_slice(prefix);
+		if (mode & 256) {
+			msg~store_slice(data.begin_parse());
+			mode -= 256;
+		} else {
+			msg~store_ref(data);
+		}
+	}
+	if (suffix.null?() == 0) {
+		msg~store_slice(suffix);
+	}
+	send_raw_message(msg.end_cell(), mode | MF:IgnoreErrors);
+}
+
+(int, int) Slice:Lengths(slice val) { ;; only for internal calcs
+	int cells = 1;
+	int bits = val.slice_bits();
+	while (val.slice_refs()) {
+		(int in_cells, int in_bits) = Slice:Lengths(val~load_ref().begin_parse());
+		cells += in_cells; bits += in_bits;
+	}
+	return (cells, bits);
+}
+
+;;===========================================================================;;
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+	slice cs = in_msg_cell.begin_parse();
+	int msgflg = cs~load_uint(BL:MsgFlags);
+	if (msgflg & 1) { return (); } ;; bounced messages
+	slice s_addr = cs~load_msg_addr();
+	(int src_wc, int src_addr) = s_addr.parse_std_addr();
+	var data = Storage:Load();
+	int now = now();
+	if (in_msg.slice_bits() < BL:OpLength) { return(); }
+	int op = in_msg~load_uint(BL:OpLength);
+	if (op == 0) { return(); } ;; simple transfer with comment
+	slice box_name = in_msg~load_ref().begin_parse();
+	cell root = data.[box_tree];
+	(slice name, slice val, slice tail, int succ) = root.pfxdict_get?(BL:PrefixKey, box_name);
+	throw_unless(44, succ); 
+	throw_unless(45, tail.slice_empty?());
+	var box = Box:Load(val);
+	int bflags = box.[flags];
+	slice nslice = null();
+	if (op == Op:Inquiry) {
+		throw_unless(33, bflags.AllowInquiry?);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance, in_msg, box.[data], nslice);
+		return ();
+	}
+	if (op == Op:Proxy) {
+		throw_unless(33, bflags.AllowInline?);
+		int targ_wcid = in_msg~load_int(BL:ChainId);
+		int targ_addr = in_msg~load_uint(BL:Address);
+		int box_mode  = in_msg~load_uint(1);
+		slice prefix  = in_msg~load_ref().begin_parse();
+		slice suffix  = in_msg~load_ref().begin_parse();
+		Message:Send(targ_wcid, targ_addr, 0, MF:MsgBalance | (box_mode << 8), prefix, box.[data], suffix);
+		return ();
+	}
+	throw_if(39, bflags.Frozen?);
+	throw_unless(32, bflags.HasOwner?);
+	throw_if(32, box.[owner_wc] != src_wc);
+	throw_if(32, box.[owner_addr] != src_addr);
+	if (op == Op:BoxSet) {
+		cell new_val = in_msg~load_ref();
+		if (bflags.UseQuota?) {
+			(int cells, int bits) = Slice:Lengths(new_val.begin_parse());
+			int quota_cells = box.[quota_cells];
+			int quota_bits = box.[quota_bits];
+			throw_if(48, (quota_cells > 0) & (cells > quota_cells));
+			throw_if(49, (quota_bits > 0) & (bits > quota_bits));
+		}
+		box~[data]= new_val;
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance, null(), null(), null());
+		return ();
+	}
+	if (op == Op:BoxConfig) {
+		box = Box:Configure(box, in_msg, false);
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance, null(), null(), null());
+		return ();
+	}
+	if (op == Op:Protect) {
+		throw_unless(46, bflags.FRPending?);
+		box~[flags]= (bflags & Flag:!FRPending);
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance, null(), null(), null());
+		return ();
+	}
+	if (op == Op:Unprotect) {
+		box~[flags]= (bflags & Flag:!FRPending & Flag:!Protected);
+		Box:Store(box, root, data, name);
+		Message:Send(src_wc, src_addr, 0, MF:MsgBalance, null(), null(), null());
+		return ();
+	}
+	
+}
+
+() recv_external(slice in_msg) impure {
+	int now = now();
+	var data = Storage:Load();
+	int flags = data.[flags];
+	slice signature = in_msg~load_bits(BL:Signature);
+	int shash = slice_hash(in_msg);
+	throw_unless(42, check_signature(shash, signature, data.[owner_key]));
+	int seq_no = in_msg~load_uint(BL:SeqNumber);
+	throw_unless(43, seq_no == data.[seq_no]);
+	accept_message();
+	data~[seq_no]= (seq_no + 1);
+	Storage:Save(data);
+	commit();
+	int op = in_msg~load_uint(BL:OpLength);
+	if (op == 0) { return (); } ;; initialization
+	if (op == Op:ChOwner) {
+		data~[owner_key]= (in_msg~load_uint(BL:PublicKey));
+		Storage:Save(data);
+		return ();
+	}
+	if (op == Op:ChangeFRT) {
+		int new_frt_val = in_msg~load_uint(BL:FRT);
+		if (flags.ChangingFRT?) {
+			throw_unless(45, data.[new_frt_value] == new_frt_val);
+			throw_unless(44, now >= data.[new_frt_timer]);
+			flags &= Flag:!ChangingFRT;
+			data~[flags]= flags;
+			data~[protected_frt]= (data.[new_frt_value]);
+			Storage:Save(data);
+			return();
+		}
+		data~[flags]= (flags | Flag:ChangingFRT);
+		data~[new_frt_value]= new_frt_val;
+		int interval = data.[protected_frt];
+		if (interval == 0) {
+			interval = (FRT:InitialTimerBase - new_frt_val);
+		}
+		interval = max(FRT:MinimumTimer, interval);
+		data~[new_frt_timer]= (now + interval);
+		Storage:Save(data);
+		return ();
+	}
+	;; ---------------------------------------------------------------------------------------
+	slice box_name = in_msg~load_ref().begin_parse();
+	;; (_, int name_last_byte) = box_name.slice_last(8).load_uint(8);
+	;; throw_unless(40, name_last_byte == 0);
+	cell root = data.[box_tree];
+	(slice name, slice val, slice tail, int succ) = root.pfxdict_get?(BL:PrefixKey, box_name);
+	if (op == Op:BoxNew) {
+		throw_if(44, succ); ;; found box or name collision
+;; (int flags, int owner_wc, int owner_addr, int quota_cells, int quota_bits, int fr_timeout, cell data)
+		var nbox = PackBox(0, 0, 0, 0, 0, 0, begin_cell().end_cell());
+		nbox = Box:Configure(nbox, in_msg, true);
+		Box:Store(nbox, root, data, name);
+		return ();
+	}
+	;; ---------------------------------------------------------------------------------------
+	throw_unless(44, succ); 
+	throw_unless(45, tail.slice_empty?());
+	var box = Box:Load(val);
+	int bflags = box.[flags];
+	if (op == Op:Thaw) {
+		throw_unless(39, bflags.Frozen?);
+		box~[flags]= (bflags & Flag:!Frozen);
+		Box:Store(box, root, data, name);
+		return ();
+	}
+	throw_if(39, bflags.Frozen?);
+	if (op == Op:ForceRes) {
+		if (bflags.FRPending?) {
+			throw_unless(47, now >= box.[fr_timeout]);
+			box~[flags]= (bflags & Flag:!FRPending & Flag:!Protected);
+			Box:Store(box, root, data, name);
+			return ();
+		}
+		throw_unless(46, data.[protected_frt] > 0);
+		box~[flags]= (bflags | Flag:FRPending);
+		box~[fr_timeout]= (now + data.[protected_frt]);
+		Box:Store(box, root, data, name);
+		return ();
+	}
+	if (op == Op:BoxConfig) {
+		box = Box:Configure(box, in_msg, true);
+		Box:Store(box, root, data, name);
+		return ();
+	}
+	throw_if(38, bflags.Protected?);
+	if (op == Op:BoxDelete) {
+		throw_unless(31, root~pfxdict_delete?(BL:PrefixKey, name));
+		data~[box_tree]= root;
+		Storage:Save(data);
+		return ();
+	}
+	if (op == Op:Freeze) {
+		box~[flags]= (bflags | Flag:Frozen);
+		Box:Store(box, root, data, name);
+		return ();
+	}
+	
+	if (op == Op:Protect) {
+		throw_unless(38, bflags.HasOwner?);
+		box~[flags]= (bflags | Flag:Protected);
+		Box:Store(box, root, data, name);
+		return ();
+	}
+
+	if (op == Op:BoxSet) {
+		cell new_val = in_msg~load_ref();
+		box~[data]= new_val;
+		Box:Store(box, root, data, name);
+		return ();
+	}
+	throw(40); ;; Unknown operation
+}
+
+;;===========================================================================;;
+
+int seqno() method_id { ;; Retrieve sequence number
+	return Storage:Load().[seq_no];
+}
+
+tuple get_box_internal(slice box_name, int for_value) {
+	var data = Storage:Load();
+	cell root = data.[box_tree];	
+	(slice name, slice val, slice tail, int succ) = root.pfxdict_get?(BL:PrefixKey, box_name);
+	throw_unless(44, succ); 
+	throw_unless(45, tail.slice_empty?());
+	var box = Box:Load(val);
+	if (for_value == 0) {
+		box~[data]= (null());
+	}
+	return box;
+}
+
+tuple get_box(slice box_name) method_id {
+	return get_box_internal(box_name, false);
+}
+
+cell get_box_value(slice box_name) method_id {
+	var box = get_box_internal(box_name, true);
+	throw_unless(33, box.[flags].AllowGet?);
+	return box.[data];
+}
