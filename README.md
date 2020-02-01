@@ -39,6 +39,7 @@ Summarizing proposed changes and fixed in [this pull request](https://github.com
 | fift asm enh   | [unused procs opt](https://github.com/ton-blockchain/ton/pull/230) | *not yet...* | Improved TVM assembler fift library with detection of unused procedures and more |
 | fift enhance   | [error backtrace](https://github.com/ton-blockchain/ton/pull/231) | *not yet...* | Added a `-t` flag that displays backtrace of error and if `-tt` is used stack dumps |
 | func enhance   | [implicit functions](https://github.com/ton-blockchain/ton/pull/236) | *not yet...* | Added `implicit` functions that do not need to be followed by args and even `()` tuple. |
+| **ve bugfix**  | **[ve memory leak](https://github.com/ton-blockchain/ton/issues/235#issuecomment-581017463)** | *in prog...* | Analyzing and tackling the memory leak in validator engine, at least one possible fix suggested in issue (very important issue) |
 
 There were some other ideas, that were trashed for one or another reason, due to low subjective usefulness, high complexity or unprepared infrastructure, you can get acquainted with them [here](doc/Unchosen.md), if interested.
 
