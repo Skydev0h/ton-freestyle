@@ -1,3 +1,7 @@
+# [Click here to visit web pages for the contest](https://skydev0h.github.io/ton-freestyle-2/)
+
+---
+
 # TON freestyle contest entry
 
 [*(Blockchain competition number 2 - Official requirements and documentation)*](doc/Official.md)
