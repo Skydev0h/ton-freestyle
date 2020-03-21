@@ -1,4 +1,4 @@
-# [Click here to visit web pages for the contest](https://skydev0h.github.io/ton-freestyle-2/)
+# [Click here to visit web pages for the contest](https://skydev0h.github.io/ton-freestyle-2/?3)
 
 ---
 
