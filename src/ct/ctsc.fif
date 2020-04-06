@@ -33,19 +33,19 @@ Storage:Load PROCREF:<{
     OVER
     0 EQINT
     IF:<{
-      s2 POP
-      SWAP
+      1 2 BLKDROP2
       8 LDI
-    }>ELSE<{
       s1 s2 XCHG
     }>
     256 LDU
-  }>ELSE<{
-    3 ROLL
+    s3 s3 XCHG2
   }>
+  s0 s3 XCHG
   8 LDI
   256 LDU
   ENDS
+  s3 s4 XCHG
+  s2 s3 XCHG
   14 TUPLE
 }>
 Storage:Save PROCREF:<{
@@ -82,8 +82,7 @@ Storage:Save PROCREF:<{
     }>
     256 STU
   }>ELSE<{
-    s0 s3 XCHG
-    3 BLKDROP
+    3 1 BLKDROP2
   }>
   8 STI
   256 STU
@@ -121,8 +120,8 @@ Logic:DoRelease PROC:<{
   6 SETINDEX
   DUP
   8 INDEX
+  SWAP
   PUSHNULL
-  s1 s2 XCHG
   7 SETINDEX
   PUSHNULL
   8 SETINDEX
@@ -161,14 +160,12 @@ Logic:DoRelease PROC:<{
           MUL
           1000000 PUSHINT
           DIV
+          SWAP
         }>ELSE<{
-          -ROT
-          DROP
+          NIP
         }>
-      }>ELSE<{
-        SWAP
       }>
-      s4 PUSH
+      s1 s4 XCPU
       MIN
       DUP
       0 GTINT
@@ -187,25 +184,22 @@ Logic:DoRelease PROC:<{
         SENDRAWMSG
         s1 s2 XCHG
         SUB
+        SWAP
       }>ELSE<{
-        s1 s4 XCHG
         s1 s3 XCHG
         3 BLKDROP
       }>
-      OVER
+      DUP
       SBITS
       0 EQINT
-      s2 PUSH
+      OVER
       SREFS
       0 GTINT
       AND
       IF:<{
-        SWAP
         LDREF
         DROP
         CTOS
-      }>ELSE<{
-        SWAP
       }>
     }>
     s3 s4 XCHG
@@ -356,28 +350,27 @@ recv_internal PROC:<{
     8 SETINDEX
     DUP
     Storage:Save INLINECALLDICT
-  }>ELSE<{
-    s0 s9 XCHG
     s0 s7 XCHG
+    s0 s9 XCHG
   }>
-  s7 PUSH
+  s9 PUSH
   2 PUSHINT AND
-  s8 PUSH
+  s10 PUSH
   8 PUSHINT AND ISZERO
   AND
-  s10 PUSH
+  OVER
   0 GTINT
   AND
-  s4 s10 PUSH2
+  s4 s1 PUSH2
   GEQ
   AND
-  OVER
+  s8 PUSH
   0 INDEX
   s4 s(-1) PUXC
   GEQ
   AND
   IFJMP:<{
-    s0 s10 XCHG
+    s7 s10 XCHG
     10 BLKDROP
     Logic:DoRelease CALLDICT
   }>
@@ -395,9 +388,9 @@ recv_internal PROC:<{
     ENDC
     CTOS
   }>
-  s6 PUSH
-  11 INDEX
   s7 PUSH
+  11 INDEX
+  s8 PUSH
   10 INDEX
   0 PUSHINT
   s11 PUSH
@@ -407,30 +400,28 @@ recv_internal PROC:<{
     DROP
     s0 s10 XCHG
     32 LDU
-  }>ELSE<{
-    s0 s11 XCHG2
+    s11 s11 XCHG2
   }>
   s2 PUSH
   0 NEQINT
-  s10 PUSH
+  s11 PUSH
   9 INDEX
   0 EQINT
   AND
-  s11 PUSH
+  s13 PUSH
   8 PUSHINT AND ISZERO
   AND
-  s9 s12 PUXC
+  s9 s2 PUXC
   EQUAL
-  s1 s12 XCHG
+  s1 s2 XCHG
   AND
   s7 s2 PUXC
   EQUAL
   s1 s2 XCHG
   AND
   IFJMP:<{
-    s0 s3 XCHG
+    s7 POP
     3 BLKDROP
-    s5 POP
     s5 POP
     s5 POP
     s5 POP
@@ -439,65 +430,59 @@ recv_internal PROC:<{
     s3 s6 XCHG
     s2 s5 XCHG
     Message:Send INLINECALLDICT
-    s2 PUSH
     1382378597 PUSHINT
+    s2 s(-1) PUXC
     EQUAL
     IF:<{
-      s2 POP
-      SWAP
+      NIP
       Controller:ReleaseFunds CALLDICT
     }>ELSE<{
       1382247533 PUSHINT
-      s1 s3 XCHG
+      s1 s2 XCHG
       EQUAL
       IF:<{
-        SWAP
         Controller:InitiateReclaim CALLDICT
       }>ELSE<{
         2DROP
       }>
     }>
   }>
-  s8 PUSH
+  s10 PUSH
   2 PUSHINT AND ISZERO
-  s9 PUSH
+  s11 PUSH
   8 PUSHINT AND ISZERO
   AND
-  s11 PUSH
+  s8 PUSH
   0 GTINT
   AND
-  s5 s11 PUXC
+  s5 s8 PUXC
   GEQ
-  s1 s11 XCHG
+  s1 s8 XCHG
   AND
   IF:<{
     8 PUSHINT
-    s1 s8 XCHG
+    s1 s10 XCHG
     OR
-    s6 s6 XCPU
+    s7 s7 XCPU
     6 SETINDEX
     PUSHNULL
     8 SETINDEX
     DUP
     Storage:Save INLINECALLDICT
     COMMIT
-  }>ELSE<{
     s0 s7 XCHG
-    s0 s6 XCHG
+    s0 s9 XCHG
   }>
-  DUP
-  7 INDEX
   s7 PUSH
+  7 INDEX
+  s10 PUSH
   8 PUSHINT AND
   IFJMP:<{
-    s2 POP
-    s2 POP
-    s2 POP
-    s4 POP
+    s7 s9 XCHG2
+    5 BLKDROP
     s5 POP
     s5 POP
-    s5 POP
-    s1 s2 PUSH2
+    s0 s2 PUSH2
     264 PUSHINT
     DICTGET
     NULLSWAPIFNOT
@@ -508,7 +493,7 @@ recv_internal PROC:<{
       64 PUSHINT
       Message:Send INLINECALLDICT
     }>
-    s2 s3 XCHG2
+    s0 s3 XCHG
     264 PUSHINT
     DICTDEL
     DROP
@@ -525,34 +510,28 @@ recv_internal PROC:<{
   }>
   5000000000 PUSHINT
   1197568811 PUSHINT
-  s1 s12 XCHG
+  s1 s9 XCHG
   EQUAL
   IF:<{
     s0 s9 XCHG
     LDGRAMS
     DROP
-    s1 s10 XCHG
+    s1 s7 XCHG
     MAX
+    s0 s6 XCHG
   }>ELSE<{
-    s10 s9 XCHG2
-    DROP
+    s9 POP
   }>
-  DUP
-  BUYGAS
-  DROP
-  s1 s10 XCHG
+  s10 s6 XCHG2
   SUB
-  s8 PUSH
+  s6 PUSH
   2 INDEX
   s1 s(-1) PUXC
   LESS
   IFJMP:<{
     3 BLKDROP
-    s2 POP
-    s2 POP
-    s2 POP
-    s2 POP
-    s2 POP
+    s5 s6 XCHG2
+    5 BLKDROP
     0 PUSHINT
     64 PUSHINT
     s2 s3 XCHG
@@ -564,53 +543,47 @@ recv_internal PROC:<{
   GEQ
   s1 s9 XCHG
   AND
-  s0 s4 XCHG
+  s0 s7 XCHG
   4 PUSHINT AND ISZERO
-  s1 s4 XCHG
+  s1 s7 XCHG
   AND
   IFJMP:<{
-    s2 POP
-    s2 POP
-    s2 POP
-    s2 POP
-    s2 POP
+    s5 s6 XCHG2
+    5 BLKDROP
     0 PUSHINT
     64 PUSHINT
     s2 s3 XCHG
     Message:Send INLINECALLDICT
   }>
-  s5 PUSH
+  s3 PUSH
   1 INDEX
   DUP
   0 GTINT
-  s8 s4 PUSH2
+  s8 s7 PUSH2
   ADD
   s2 PUSH
   GREATER
   AND
   IF:<{
-    s3 POP
-    s2 s6 XCPU
+    s6 POP
+    s5 s6 XCPU
     SUB
+    s0 s5 XCHG
   }>ELSE<{
-    s1 s3 XCHG
     DROP
   }>
-  DUP
+  s5 PUSH
   0 EQINT
   IFJMP:<{
-    DROP
-    s2 POP
-    s2 POP
-    s2 POP
-    s2 POP
+    s5 s6 XCHG2
+    5 BLKDROP
     0 PUSHINT
     64 PUSHINT
     s2 s3 XCHG
     Message:Send INLINECALLDICT
   }>
   0 PUSHINT
-  s4 s5 PUSH2
+  s3 s5 PUSH2
   264 PUSHINT
   DICTGET
   NULLSWAPIFNOT
@@ -621,18 +594,18 @@ recv_internal PROC:<{
   }>ELSE<{
     DROP
   }>
-  OVER
+  s6 PUSH
   ADD
   NEWC
   SWAP
   STGRAMS
-  s0 s4 s5 XCHG3
+  s0 s3 s5 XCHG3
   264 PUSHINT
   DICTSETB
-  s1 s4 XCHG
+  s1 s2 XCHG
   7 SETINDEX
   Storage:Save INLINECALLDICT
-  s1 s3 XCHG
+  2SWAP
   ADD
   0 PUSHINT
   RAWRESERVE
@@ -687,8 +660,8 @@ recv_external PROC:<{
   SWAP
   32 LDU
   DROP
-  DUP
   1382378597 PUSHINT
+  s1 s(-1) PUXC
   EQUAL
   IF:<{
     DROP
@@ -713,8 +686,8 @@ reclaiming PROC:<{
   8 PUSHINT AND
 }>
 reclaimable PROC:<{
+  SWAP
   NEWC
-  s1 s2 XCHG
   8 STI
   256 STU
   ENDC

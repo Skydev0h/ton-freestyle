@@ -364,7 +364,7 @@ tuple Storage:Load() inline_ref {
 		;; 	reserved = newreserved;
 		;;}
 	}
-	buy_gas(reserved);
+	;; buy_gas(reserved);
 	
 	int deposit = msg_value - reserved;
 	int min_accepted = data.[min_accepted];
